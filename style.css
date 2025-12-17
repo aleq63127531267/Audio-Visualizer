@@ -1,0 +1,515 @@
+/* Layout */
+body {
+  margin: 0;
+  overflow: hidden;
+  background: #000;
+  color: #fff;
+  font-family: 'Inter', sans-serif;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+#app-header {
+  background: rgba(0, 0, 0, 0.8);
+  padding: 10px 20px;
+  text-align: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  z-index: 20;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+#main-content {
+  display: flex;
+  flex-grow: 1;
+  position: relative;
+  overflow: hidden;
+}
+
+#side-panel {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 250px;
+  background: rgba(10, 10, 10, 0.95);
+  backdrop-filter: blur(10px);
+  border-right: 1px solid #333;
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.3s ease;
+  z-index: 50;
+  transform: translateX(0);
+}
+
+#side-panel.hidden {
+  transform: translateX(-100%);
+  width: 250px;
+  /* Keep width fixed for transform */
+}
+
+/* ... headers ... */
+
+.layer-settings {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  font-size: 0.8rem;
+  align-items: center;
+}
+
+.layer-settings select {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.layer-settings input[type="range"] {
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0;
+}
+
+.icon-btn {
+  background: transparent;
+  border: 1px solid #444;
+  padding: 4px 8px;
+  font-size: 0.8rem;
+}
+
+#viz-stage {
+  flex-grow: 1;
+  position: relative;
+  background: #111;
+  overflow: hidden;
+  margin: 0;
+  /* Remove margin to flush with panel */
+  border: none;
+  box-shadow: inset 0 0 50px rgba(0, 0, 0, 0.5);
+}
+
+#visualizer-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+
+.controls-divider {
+  width: 100%;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.1);
+  margin: 10px 0;
+}
+
+.input-controls {
+  width: 100%;
+  justify-content: center;
+}
+
+.control-label {
+  font-size: 0.9em;
+  color: #aaa;
+  margin-right: 10px;
+}
+
+#btn-mic-toggle.active {
+  background: #ff5555;
+  border-color: #ff5555;
+  color: white;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 85, 85, 0.4);
+  }
+
+  70% {
+    box-shadow: 0 0 0 10px rgba(255, 85, 85, 0);
+  }
+
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 85, 85, 0);
+  }
+}
+
+#ui-container {
+  background: #000;
+  padding: 15px 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+}
+
+.controls-row {
+  display: flex;
+  gap: 15px;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+button,
+select,
+input[type="file"]::file-selector-button {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  padding: 8px 16px;
+  border-radius: 20px;
+  cursor: pointer;
+  backdrop-filter: blur(5px);
+  transition: all 0.2s;
+  font-family: inherit;
+  font-size: 14px;
+}
+
+button:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateY(-1px);
+}
+
+.playback-controls {
+  display: flex;
+  gap: 10px;
+}
+
+.scrubber-container {
+  width: 100%;
+  max-width: 600px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+#seek-bar {
+  flex-grow: 1;
+  cursor: pointer;
+}
+
+#file-name {
+  font-size: 0.9em;
+  opacity: 0.7;
+  margin-bottom: 5px;
+}
+
+#btn-loop {
+  padding: 5px 10px;
+  font-size: 1.2rem;
+  line-height: 1;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.7);
+}
+
+#btn-loop:hover {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+#btn-loop.active {
+  background: rgba(0, 255, 255, 0.2);
+  color: #0ff;
+  border-color: #0ff;
+  box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+}
+
+/* Panel Container */
+#panels-container {
+  position: absolute;
+  bottom: 120px;
+  right: 20px;
+  display: flex;
+  flex-direction: row-reverse;
+  /* Stacks to the left */
+  gap: 15px;
+  align-items: flex-end;
+  pointer-events: none;
+  /* Allow clicks to pass through gaps */
+  z-index: 50;
+}
+
+/* Color Panel */
+.color-panel {
+  /* Position managed by flex container */
+  position: relative;
+  bottom: auto;
+  right: auto;
+
+  background: rgba(0, 0, 0, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 20px;
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  width: 300px;
+  max-height: 80vh;
+  overflow-y: auto;
+  pointer-events: auto;
+  /* Re-enable pointer events */
+}
+
+.color-panel h3 {
+  margin: 0;
+  font-size: 1.1em;
+  text-align: center;
+}
+
+.color-panel.hidden {
+  display: none;
+}
+
+.color-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.gradient-preview-container {
+  background: #222;
+  padding: 5px;
+  border-radius: 5px;
+  text-align: center;
+}
+
+#gradient-preview {
+  width: 100%;
+  height: 20px;
+  border-radius: 3px;
+  border: 1px solid #444;
+}
+
+.layer-item {
+  background: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 4px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  cursor: pointer;
+  /* Clickable */
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.layer-item:hover {
+  background: #252525;
+}
+
+#layers-list {
+  flex: 1 1 40%;
+  /* Take up ~40% space but shrink/grow */
+  overflow-y: auto;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 150px;
+}
+
+#recordings-list {
+  flex: 1 1 40%;
+  overflow-y: auto;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-top: 1px solid #333;
+  min-height: 150px;
+}
+
+.recording-item {
+  background: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 4px;
+  padding: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.85rem;
+}
+
+.recording-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 120px;
+}
+
+.recording-controls {
+  display: flex;
+  gap: 5px;
+}
+
+.empty-state {
+  color: #666;
+  font-style: italic;
+  text-align: center;
+  padding: 10px;
+}
+
+.layer-item.selected {
+  border-color: #00ffff;
+  background: #222;
+  box-shadow: 0 0 10px rgba(0, 255, 255, 0.1);
+}
+
+#color-stops-container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.color-stop-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 8px;
+  border-radius: 5px;
+}
+
+.color-stop-row input[type="color"] {
+  border: none;
+  width: 30px;
+  height: 30px;
+  cursor: pointer;
+  background: none;
+}
+
+.color-stop-row input[type="range"] {
+  flex-grow: 1;
+  cursor: pointer;
+}
+
+.btn-remove-stop {
+  background: transparent;
+  border: none;
+  color: #ff5555;
+  font-size: 18px;
+  padding: 0 5px;
+  cursor: pointer;
+}
+
+.btn-remove-stop:hover {
+  color: #ff0000;
+  background: transparent;
+  transform: scale(1.1);
+}
+
+.small-btn {
+  padding: 5px 10px;
+  font-size: 0.9em;
+  align-self: center;
+}
+
+/* Recording Mode Styles */
+body.recording-mode #ui-container,
+body.recording-mode #app-header,
+body.recording-mode #panels-container {
+  display: none !important;
+}
+
+body.recording-mode #viz-stage {
+  margin: 0;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+body.recording-mode {
+  cursor: none;
+  /* Hide cursor in recording mode */
+}
+
+#countdown-overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 5rem;
+  font-weight: bold;
+  color: white;
+  z-index: 30;
+  pointer-events: none;
+  text-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+  display: none;
+}
+
+#exit-hint {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  color: rgba(255, 255, 255, 0.5);
+  z-index: 30;
+  display: none;
+}
+
+/* Delete Mode Styles */
+.layer-item.marked,
+.recording-item.marked {
+  border-color: #ff4444;
+  background: rgba(255, 68, 68, 0.1);
+}
+
+.icon-btn.delete-active {
+  background: #ff4444;
+  border-color: #ff4444;
+  color: white;
+}
+
+.layer-title[contenteditable="true"]:focus,
+.recording-name[contenteditable="true"]:focus {
+  outline: 1px solid #00ffff;
+  background: #000;
+  padding: 2px 4px;
+  cursor: text;
+}
+
+/* Mini slider for recording controls */
+.mini-slider {
+  width: 60px;
+  height: 4px;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
+}
+
+.mini-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #00ffff;
+  cursor: pointer;
+}
+
+.mini-slider::-moz-range-thumb {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #00ffff;
+  cursor: pointer;
+  border: none;
+}
