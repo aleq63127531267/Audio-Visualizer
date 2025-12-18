@@ -19,7 +19,10 @@ export function drawBars(ctx, canvas, dataArray, bufferLength, vizColors, layer)
     const settings = layer?.vizSettings?.bars || DEFAULTS;
     const barWidthMultiplier = settings.barWidthMultiplier || DEFAULTS.barWidthMultiplier;
 
+    if (!bufferLength || bufferLength === 0) return; // Proactive NaN guard
+
     const barWidth = (width / bufferLength) * barWidthMultiplier;
+
     let barHeight;
     let x = 0;
 

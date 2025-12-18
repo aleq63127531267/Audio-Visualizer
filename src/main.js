@@ -3,7 +3,7 @@ import { drawBars, invalidateBarsCache } from './visualizers/bars.js';
 import { drawCircle, invalidateCircleCache } from './visualizers/circle.js';
 import { drawCircleLinear, invalidateCircleLinearCache } from './visualizers/circle-linear.js';
 import { drawParticles, scaleParticles, setParticleCount } from './visualizers/particles.js';
-import { drawCrystalWall } from './visualizers/crystal.js';
+import { drawProximityDots, scaleProximityNodes } from './visualizers/proximityDots.js';
 
 const canvas = document.getElementById('visualizer-canvas');
 const ctx = canvas.getContext('2d');
@@ -45,7 +45,11 @@ function resize() {
     if (layer.type === 'particles' && layer.vizState?.particles) {
       scaleParticles(oldW, oldH, newW, newH, layer);
     }
+    if (layer.type === 'proximityDots' && layer.vizState?.nodes) {
+      scaleProximityNodes(oldW, oldH, newW, newH, layer);
+    }
   });
+
 
   // Invalidate gradient caches on resize
   invalidateBarsCache();
@@ -74,9 +78,25 @@ let layers = [
     visible: true,
     opacity: 1.0,
     locked: false,
-    selected: false // Add selected state
+    selected: false, // Add selected state
+    fftSize: 2048,
+    // Per-layer color settings
+    colors: {
+      mode: 'gradient-freq',
+      stops: [
+        { offset: 0, color: '#00ffff' },
+        { offset: 100, color: '#ff00ff' }
+      ]
+    }
   }
 ];
+
+// Ensure initial layer has sortedStops if needed
+if (layers[0].colors) {
+  layers[0].colors.sortedStops = [...layers[0].colors.stops].sort((a, b) => a.offset - b.offset);
+}
+
+
 
 // Mic Controls
 const btnMicToggle = document.getElementById('btn-mic-toggle');
@@ -99,7 +119,7 @@ const visualizers = {
   'circle': drawCircle,
   'circle-linear': drawCircleLinear,
   'particles': drawParticles,
-  'crystal': drawCrystalWall
+  'proximityDots': drawProximityDots
 };
 
 function formatTime(seconds) {
@@ -170,8 +190,15 @@ function renderLayersList() {
 
     // Click Handler (Mode Dependent)
     item.addEventListener('click', (e) => {
-      // Ignore controls
-      if (e.target.tagName === 'BUTTON' || e.target.tagName === 'SELECT' || e.target.tagName === 'INPUT' || e.target.isContentEditable) return;
+      // Ignore controls and the title itself to allow double-clicks/editing
+      if (
+        e.target.tagName === 'BUTTON' ||
+        e.target.tagName === 'SELECT' ||
+        e.target.tagName === 'INPUT' ||
+        e.target.classList.contains('layer-title') ||
+        e.target.isContentEditable
+      ) return;
+
 
       if (isLayerDeleteMode) {
         layer.markedForDelete = !layer.markedForDelete;
@@ -200,6 +227,8 @@ function renderLayersList() {
 
     const title = document.createElement('div');
     title.className = 'layer-title';
+    title.id = `title-${layer.id}`; // Add ID to fix form field warning
+
     // Name + Assigned File
     let label = `Layer ${index + 1}: ${layer.type}`;
     if (layer.customName) label = layer.customName; // Logic for custom name
@@ -207,29 +236,83 @@ function renderLayersList() {
 
     title.textContent = label;
 
-    // Rename Logic
-    title.ondblclick = () => {
-      title.contentEditable = true;
+    // Helper function to enable editing
+    let isCanceling = false;
+    const enableEditing = () => {
+      isCanceling = false;
+      title.contentEditable = 'true';
       title.focus();
+      // Select all text for easy replacement
+      setTimeout(() => {
+        if (!title.contentEditable || isCanceling) return;
+        // Check if element is still in DOM
+        if (!document.body.contains(title)) return;
+
+        try {
+          const sel = window.getSelection();
+          sel.removeAllRanges();
+          const range = document.createRange();
+          range.selectNodeContents(title);
+          sel.addRange(range);
+        } catch (err) {
+          console.warn("Selection error:", err);
+          // Fallback selection method
+          try {
+            window.getSelection().selectAllChildren(title);
+          } catch (e2) { }
+        }
+      }, 50); // Increased delay slightly
     };
-    title.onblur = () => {
-      title.contentEditable = false;
-      layer.customName = title.textContent; // Store custom name
-      // We might lose " (File: ...)" formatting if user edits raw text. 
-      // Better: Store customName separately. If user edits "Layer 1 (Rec 1)", they save "New Name". 
-      // Next render shows "New Name (Rec 1)".
-      // So we strictly extract the name? Or just let user overwrite everything.
-      // Simple: Let user overwrite.
-    };
-    title.onkeydown = (e) => {
+
+
+    // Rename Logic - Double-click
+    title.addEventListener('dblclick', (e) => {
+      e.stopPropagation();
+      enableEditing();
+    });
+
+    title.addEventListener('blur', () => {
+      if (isCanceling) {
+        isCanceling = false;
+        return;
+      }
+      title.contentEditable = 'false';
+      // Extract just the name part (before any parentheses with file info)
+      let newName = title.textContent.trim();
+      // Remove any file info that might have been in the display
+      const parenIndex = newName.lastIndexOf(' (');
+      if (parenIndex > 0 && layer.audioName && newName.endsWith(')')) {
+        newName = newName.substring(0, parenIndex);
+      }
+      layer.customName = newName || null;
+      renderLayersList();
+    });
+
+    title.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
         e.preventDefault();
         title.blur();
       }
-    };
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        isCanceling = true;
+        title.contentEditable = 'false';
+        renderLayersList(); // Discard changes
+      }
+    });
 
     const controls = document.createElement('div');
     controls.className = 'layer-controls';
+
+    // Rename Button
+    const btnRename = document.createElement('button');
+    btnRename.className = 'icon-btn';
+    btnRename.textContent = '✏️';
+    btnRename.title = 'Rename layer';
+    btnRename.onclick = (e) => {
+      e.stopPropagation();
+      enableEditing();
+    };
 
     // Move Up
     const btnUp = document.createElement('button');
@@ -256,11 +339,13 @@ function renderLayersList() {
 
     // Removed individual btnDel
 
+    controls.appendChild(btnRename);
     controls.appendChild(btnUp);
     controls.appendChild(btnDown);
     controls.appendChild(btnVis);
     header.appendChild(title);
     header.appendChild(controls);
+
 
     // Settings
     const settings = document.createElement('div');
@@ -317,10 +402,15 @@ function addLayer() {
     id: 'layer-' + Date.now(),
     type: 'bars', // Default
     visible: true,
-    opacity: 1.0
+    opacity: 1.0,
+    selected: false,
+    fftSize: 2048,
+    colors: JSON.parse(JSON.stringify(vizColors)) // Deep copy global defaults
   });
   renderLayersList();
 }
+
+
 
 function removeLayer(id) {
   if (layers.length <= 1) return;
@@ -354,16 +444,84 @@ btnSelectAll.addEventListener('click', () => {
 fileInput.addEventListener('change', async (e) => {
   if (e.target.files.length > 0) {
     const file = e.target.files[0];
-    fileNameDisplay.textContent = file.name;
-    currentMainFileName = file.name; // Store for restore
-    try {
-      await audioEngine.loadFile(file);
-    } catch (err) {
-      console.error("Error loading file:", err);
-      alert("Error loading audio file.");
+    const selectedLayers = layers.filter(l => l.selected);
+
+    // If no layers selected, prompt user
+    if (selectedLayers.length === 0) {
+      alert('Please select a layer to assign this audio file to.');
+      e.target.value = ''; // Reset file input
+      return;
     }
+
+    fileNameDisplay.textContent = file.name;
+    currentMainFileName = file.name;
+
+    // Load file to each selected layer
+    for (const layer of selectedLayers) {
+      try {
+        // Cleanup existing audio resources
+        if (layer.audio) {
+          layer.audio.pause();
+          layer.audio.src = '';
+        }
+        if (layer.source) {
+          try { layer.source.disconnect(); } catch (e) { /* already disconnected */ }
+        }
+        if (layer.analyser) {
+          try { layer.analyser.disconnect(); } catch (e) { /* already disconnected */ }
+        }
+
+        // We need the audio context from the engine
+        await audioEngine.init();
+        const actx = audioEngine.audioContext;
+
+        if (actx.state === 'suspended') {
+          await actx.resume();
+        }
+
+        // Create blob URL for the file
+        const fileUrl = URL.createObjectURL(file);
+
+        // Create Audio element for this layer
+        const audio = new Audio(fileUrl);
+        audio.loop = false;
+
+        // Wait for audio to be loadable
+        await new Promise((resolve, reject) => {
+          audio.addEventListener('canplaythrough', resolve, { once: true });
+          audio.addEventListener('error', reject, { once: true });
+          audio.load();
+        });
+
+        // Create audio graph
+        const source = actx.createMediaElementSource(audio);
+        const analyser = actx.createAnalyser();
+        analyser.fftSize = 2048;
+
+        // Connect: source -> analyser -> destination
+        source.connect(analyser);
+        analyser.connect(actx.destination);
+
+        // Store in layer
+        layer.audio = audio;
+        layer.source = source;
+        layer.analyser = analyser;
+        layer.dataArray = new Uint8Array(analyser.frequencyBinCount);
+        layer.audioName = file.name;
+        layer.fileUrl = fileUrl;
+
+        console.log(`Assigned ${file.name} to layer ${layer.id}`);
+      } catch (err) {
+        console.error(`Error loading file for layer ${layer.id}:`, err);
+        alert(`Error loading audio file: ${err.message}`);
+      }
+    }
+
+    renderLayersList();
+    e.target.value = ''; // Reset file input for future selections
   }
 });
+
 
 // Event listeners moved below to avoid duplication (see lines 605+)
 
@@ -392,20 +550,11 @@ let vizColors = {
   sortedStops: null // Will be populated on change
 };
 
+
 // Current visualizer type (for settings visibility)
 let currentViz = 'bars';
 
-// Helper to update sortedStops
-function updateSortedStops() {
-  vizColors.sortedStops = [...vizColors.stops].sort((a, b) => a.offset - b.offset);
-  // Also invalidate gradient caches
-  invalidateBarsCache();
-  invalidateCircleCache();
-  invalidateCircleLinearCache();
-}
 
-// Initialize sorted stops
-updateSortedStops();
 
 // ... (resize, throttle, AudioEngine)
 
@@ -517,7 +666,8 @@ function assignRecordingToLayer(recUrl, recName) {
 
       // Setup new audio graph
       const audio = new Audio(recUrl);
-      audio.loop = false;
+      audio.loop = btnLoop.classList.contains('active');
+
 
       // We need the audio context
       const actx = audioEngine.audioContext;
@@ -640,7 +790,12 @@ testBtn.addEventListener('click', () => {
 btnLoop.addEventListener('click', () => {
   const isActive = btnLoop.classList.toggle('active');
   audioEngine.setLoop(isActive);
+  // Apply to all layers with audio
+  layers.forEach(l => {
+    if (l.audio) l.audio.loop = isActive;
+  });
 });
+
 
 seekBar.addEventListener('mousedown', () => {
   isSeeking = true;
@@ -838,14 +993,18 @@ function animate() {
       drawBufferLength = layer.analyser.frequencyBinCount;
     }
 
+    // Use layer-specific colors or fall back to global
+    const layerColors = layer.colors || vizColors;
+
     const vizFunc = visualizers[layer.type];
     if (vizFunc) {
       ctx.save();
       ctx.globalAlpha = layer.opacity; // Use layer opacity
-      vizFunc(ctx, canvas, drawDataArray, drawBufferLength, vizColors, layer);
+      vizFunc(ctx, canvas, drawDataArray, drawBufferLength, layerColors, layer);
       ctx.restore();
     }
   });
+
 
   updateUI();
 
@@ -857,14 +1016,36 @@ renderLayersList();
 
 // ... (EventListeners)
 
-// Color Panel Logic
+// Color Logic
+function getActiveColors() {
+  const selected = layers.filter(l => l.selected);
+  if (selected.length > 0) return selected[0].colors;
+  return vizColors;
+}
+
+function updateSortedStops(targetColors) {
+  const colorsToUpdate = targetColors ? [targetColors] :
+    (layers.filter(l => l.selected).length > 0 ?
+      layers.filter(l => l.selected).map(l => l.colors) :
+      [vizColors]);
+
+  colorsToUpdate.forEach(c => {
+    c.sortedStops = [...c.stops].sort((a, b) => a.offset - b.offset);
+  });
+
+  invalidateBarsCache();
+  invalidateCircleCache();
+  invalidateCircleLinearCache();
+}
+
 function renderColorEditor() {
+  const targetColors = getActiveColors();
   colorStopsContainer.innerHTML = '';
+  colorModeSelect.value = targetColors.mode;
 
-  // Sort stops by offset
-  vizColors.stops.sort((a, b) => a.offset - b.offset);
+  targetColors.stops.sort((a, b) => a.offset - b.offset);
 
-  vizColors.stops.forEach((stop, index) => {
+  targetColors.stops.forEach((stop, index) => {
     const row = document.createElement('div');
     row.className = 'color-stop-row';
 
@@ -873,24 +1054,27 @@ function renderColorEditor() {
     colorInput.value = stop.color;
     colorInput.oninput = (e) => {
       stop.color = e.target.value;
+      const selected = layers.filter(l => l.selected);
+      selected.forEach(l => {
+        if (l.colors.stops[index]) l.colors.stops[index].color = stop.color;
+      });
       updateSortedStops();
       updatePreview();
     };
 
-    // If single mode, no sliders
-    if (vizColors.mode === 'single') {
-      // Only show one color picker for single mode (first one)
-      if (index === 0) {
-        row.appendChild(colorInput);
-      }
+    if (targetColors.mode === 'single') {
+      if (index === 0) row.appendChild(colorInput);
     } else {
       const rangeInput = document.createElement('input');
       rangeInput.type = 'range';
-      rangeInput.min = 0;
-      rangeInput.max = 100;
+      rangeInput.min = 0; rangeInput.max = 100;
       rangeInput.value = stop.offset;
       rangeInput.oninput = (e) => {
         stop.offset = parseInt(e.target.value);
+        const selected = layers.filter(l => l.selected);
+        selected.forEach(l => {
+          if (l.colors.stops[index]) l.colors.stops[index].offset = stop.offset;
+        });
         updateSortedStops();
         updatePreview();
       };
@@ -902,65 +1086,76 @@ function renderColorEditor() {
       btnRemove.className = 'btn-remove-stop';
       btnRemove.textContent = '×';
       btnRemove.onclick = () => {
-        vizColors.stops.splice(index, 1);
+        const selected = layers.filter(l => l.selected);
+        if (selected.length > 0) {
+          selected.forEach(l => l.colors.stops.splice(index, 1));
+        } else {
+          vizColors.stops.splice(index, 1);
+        }
         updateSortedStops();
         renderColorEditor();
         updatePreview();
       };
-      // Prevent removing last stop?
-      if (vizColors.stops.length > 1) {
-        row.appendChild(btnRemove);
-      }
+      if (targetColors.stops.length > 1) row.appendChild(btnRemove);
     }
-
-    if (vizColors.mode !== 'single' || index === 0) {
-      colorStopsContainer.appendChild(row);
-    }
+    if (targetColors.mode !== 'single' || index === 0) colorStopsContainer.appendChild(row);
   });
 
-  if (vizColors.mode === 'single') {
-    btnAddStop.style.display = 'none';
-  } else {
-    btnAddStop.style.display = 'block';
-  }
-
+  btnAddStop.style.display = (targetColors.mode === 'single') ? 'none' : 'block';
   updatePreview();
 }
 
 function updatePreview() {
+  const targetColors = getActiveColors();
   const w = previewCanvas.width;
   const h = previewCanvas.height;
-
-  if (vizColors.mode === 'single') {
-    previewCtx.fillStyle = vizColors.stops[0]?.color || '#fff';
+  if (targetColors.mode === 'single') {
+    previewCtx.fillStyle = targetColors.stops[0]?.color || '#fff';
     previewCtx.fillRect(0, 0, w, h);
     return;
   }
-
   const gradient = previewCtx.createLinearGradient(0, 0, w, 0);
-  // Sort logic needed for Gradient? Canvas needs stops 0..1 sorted?
-  // User interface has 0..100.
-  // We should copy and sort for drawing.
-  const sorted = [...vizColors.stops].sort((a, b) => a.offset - b.offset);
-
-  sorted.forEach(s => {
-    gradient.addColorStop(Math.min(1, Math.max(0, s.offset / 100)), s.color);
-  });
-
+  const sorted = [...targetColors.stops].sort((a, b) => a.offset - b.offset);
+  sorted.forEach(s => gradient.addColorStop(Math.min(1, Math.max(0, s.offset / 100)), s.color));
   previewCtx.fillStyle = gradient;
   previewCtx.fillRect(0, 0, w, h);
 }
 
 btnColors.addEventListener('click', () => {
   colorPanel.classList.toggle('hidden');
-  if (!colorPanel.classList.contains('hidden')) {
-    renderColorEditor();
-  }
+  if (!colorPanel.classList.contains('hidden')) renderColorEditor();
 });
 
-btnCloseColors.addEventListener('click', () => {
-  colorPanel.classList.add('hidden');
+btnCloseColors.addEventListener('click', () => colorPanel.classList.add('hidden'));
+
+colorModeSelect.addEventListener('change', (e) => {
+  const mode = e.target.value;
+  const selected = layers.filter(l => l.selected);
+  if (selected.length > 0) {
+    selected.forEach(l => {
+      // Ensure colors object exists
+      if (!l.colors) l.colors = JSON.parse(JSON.stringify(vizColors));
+      l.colors.mode = mode;
+    });
+  } else {
+    vizColors.mode = mode;
+  }
+  updateSortedStops();
+  renderColorEditor();
+  updatePreview();
 });
+
+btnAddStop.addEventListener('click', () => {
+  const selected = layers.filter(l => l.selected);
+  if (selected.length > 0) {
+    selected.forEach(l => l.colors.stops.push({ offset: 50, color: '#ffffff' }));
+  } else {
+    vizColors.stops.push({ offset: 50, color: '#ffffff' });
+  }
+  renderColorEditor();
+  updatePreview();
+});
+
 
 // Settings DOM
 const btnSettings = document.getElementById('btn-settings');
@@ -972,12 +1167,12 @@ const settingParticlesInput = document.getElementById('setting-particles-input')
 const rowDetail = document.getElementById('row-detail');
 const rowParticles = document.getElementById('row-particles');
 
+// Settings Logic
+
+
 function updateSettingsVisibility() {
-  // Get currentViz from first selected layer or fallback
   const selectedLayer = layers.find(l => l.selected);
-  if (selectedLayer) {
-    currentViz = selectedLayer.type;
-  }
+  if (selectedLayer) currentViz = selectedLayer.type;
 
   if (currentViz === 'particles') {
     rowDetail.style.display = 'none';
@@ -990,33 +1185,39 @@ function updateSettingsVisibility() {
 
 btnSettings.addEventListener('click', () => {
   settingsPanel.classList.toggle('hidden');
-  if (!settingsPanel.classList.contains('hidden')) {
-    updateSettingsVisibility();
+  if (!settingsPanel.classList.contains('hidden')) updateSettingsVisibility();
+});
+
+btnCloseSettings.addEventListener('click', () => settingsPanel.classList.add('hidden'));
+
+settingDetail.addEventListener('input', (e) => {
+  const level = parseInt(e.target.value);
+  // Map level 1-6 to power of 2 (512 - 16384)
+  const fftSize = Math.pow(2, level + 8);
+
+  const selected = layers.filter(l => l.selected);
+  if (selected.length > 0) {
+    selected.forEach(l => {
+      l.fftSize = fftSize;
+      if (l.analyser) {
+        l.analyser.fftSize = fftSize;
+        // Re-init dataArray if size changed
+        l.dataArray = new Uint8Array(l.analyser.frequencyBinCount);
+      }
+    });
+  } else {
+    audioEngine.setFFTSize(level);
   }
 });
 
-btnCloseSettings.addEventListener('click', () => {
-  settingsPanel.classList.add('hidden');
-});
 
-settingDetail.addEventListener('input', (e) => {
-  audioEngine.setFFTSize(e.target.value);
-});
-
-// Particles Sync Logic - now layer-aware
 function updateParticleCountSafe(val) {
   if (isNaN(val) || val < 1) return;
-  // Apply to selected particle layers
   const particleLayers = layers.filter(l => l.selected && l.type === 'particles');
   if (particleLayers.length === 0) {
-    // No selected particle layer, apply to all particle layers
-    layers.filter(l => l.type === 'particles').forEach(layer => {
-      setParticleCount(val, canvas, layer);
-    });
+    layers.filter(l => l.type === 'particles').forEach(layer => setParticleCount(val, canvas, layer));
   } else {
-    particleLayers.forEach(layer => {
-      setParticleCount(val, canvas, layer);
-    });
+    particleLayers.forEach(layer => setParticleCount(val, canvas, layer));
   }
 }
 
@@ -1029,29 +1230,15 @@ settingParticles.addEventListener('input', (e) => {
 settingParticlesInput.addEventListener('input', (e) => {
   const val = parseInt(e.target.value);
   if (!isNaN(val) && val > 0) {
-    // Update slider if within range (visual feedback only)
-    // If outside range, slider stays at max/min but value works
     settingParticles.value = val;
     updateParticleCountSafe(val);
   }
 });
 
-colorModeSelect.addEventListener('change', (e) => {
-  vizColors.mode = e.target.value;
-  updateSortedStops();
-  renderColorEditor();
-  updatePreview();
-});
-
-btnAddStop.addEventListener('click', () => {
-  // Add new stop at 50%
-  vizColors.stops.push({ offset: 50, color: '#ffffff' });
-  renderColorEditor();
-  updatePreview();
-});
-
+// Recording Mode
 btnRecord.addEventListener('click', () => {
-  if (!audioEngine.audioBuffer) {
+  const hasAudio = layers.some(l => l.audio) || audioEngine.audioBuffer;
+  if (!hasAudio) {
     alert("Please upload an audio file first.");
     return;
   }
@@ -1059,24 +1246,16 @@ btnRecord.addEventListener('click', () => {
 });
 
 function startRecordingMode() {
-  // 1. Enter Fullscreen
-  if (document.documentElement.requestFullscreen) {
-    document.documentElement.requestFullscreen();
-  }
-
-  // 2. Hide UI
+  if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen();
   document.body.classList.add('recording-mode');
 
-  // Stop current playback immediately and reset
+  // Pause all
   audioEngine.stop();
-  audioEngine.seek(0);
+  layers.forEach(l => { if (l.audio) { l.audio.pause(); l.audio.currentTime = 0; } });
 
-  // 3. Countdown
   let count = 3;
   countdownOverlay.style.display = 'block';
   countdownOverlay.textContent = count;
-
-  // Show exit hint during countdown as requested
   exitHint.style.display = 'block';
 
   const interval = setInterval(() => {
@@ -1086,49 +1265,34 @@ function startRecordingMode() {
     } else {
       clearInterval(interval);
       countdownOverlay.style.display = 'none';
-      // Hide exit hint when music starts
       exitHint.style.display = 'none';
 
-      // 4. Start Audio
-      audioEngine.play(); // Explicitly play
+      // Play all assigned audios
+      audioEngine.play();
+      layers.forEach(l => { if (l.audio) l.audio.play(); });
 
-      // Add ESC listener
       document.addEventListener('keydown', handleEsc);
     }
   }, 1000);
 }
 
 function handleEsc(e) {
-  if (e.key === 'Escape') {
-    exitRecordingMode();
-  }
+  if (e.key === 'Escape') exitRecordingMode();
 }
 
 function exitRecordingMode() {
   document.removeEventListener('keydown', handleEsc);
-
-  // Stop Audio
-  if (audioEngine.isPlaying) {
-    audioEngine.stop();
-  }
-
+  audioEngine.stop();
+  layers.forEach(l => { if (l.audio) l.audio.pause(); });
   document.body.classList.remove('recording-mode');
-
-  if (document.fullscreenElement) {
-    document.exitFullscreen();
-  }
-
-  // Ensure overlays hidden
+  if (document.fullscreenElement) document.exitFullscreen();
   countdownOverlay.style.display = 'none';
   exitHint.style.display = 'none';
 }
 
 document.addEventListener('fullscreenchange', () => {
   if (!document.fullscreenElement && document.body.classList.contains('recording-mode')) {
-    // User exited fullscreen via browser key, sync state
-    audioEngine.stop();
-    document.body.classList.remove('recording-mode');
-    document.removeEventListener('keydown', handleEsc);
+    exitRecordingMode();
   }
 });
 

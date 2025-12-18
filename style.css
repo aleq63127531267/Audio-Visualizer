@@ -33,6 +33,15 @@ body {
   gap: 20px;
 }
 
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 10px 5px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  flex-shrink: 0;
+}
+
 #main-content {
   display: flex;
   flex-grow: 1;
@@ -99,13 +108,16 @@ body {
   /* Remove margin to flush with panel */
   border: none;
   box-shadow: inset 0 0 50px rgba(0, 0, 0, 0.5);
+  box-sizing: border-box;
 }
 
 #visualizer-canvas {
   display: block;
   width: 100%;
   height: 100%;
+  box-sizing: border-box;
 }
+
 
 
 .controls-divider {
@@ -180,6 +192,21 @@ input[type="file"]::file-selector-button {
   font-family: inherit;
   font-size: 14px;
 }
+
+/* Ensure select dropdowns have proper styling on all platforms */
+select {
+  background-color: rgba(30, 30, 30, 0.95);
+  color: #fff;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+}
+
+select option {
+  background-color: #1a1a1a;
+  color: #fff;
+}
+
 
 button:hover {
   background: rgba(255, 255, 255, 0.2);
@@ -315,25 +342,24 @@ button:hover {
 }
 
 #layers-list {
-  flex: 1 1 40%;
-  /* Take up ~40% space but shrink/grow */
+  flex: 1;
   overflow-y: auto;
   padding: 10px;
   display: flex;
   flex-direction: column;
   gap: 10px;
-  min-height: 150px;
+  min-height: 100px;
 }
 
 #recordings-list {
-  flex: 1 1 40%;
+  flex: 1;
   overflow-y: auto;
   padding: 10px;
   display: flex;
   flex-direction: column;
   gap: 10px;
   border-top: 1px solid #333;
-  min-height: 150px;
+  min-height: 100px;
 }
 
 .recording-item {
