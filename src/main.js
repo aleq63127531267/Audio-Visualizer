@@ -8,6 +8,16 @@ import { drawProximityDots, scaleProximityNodes } from './visualizers/proximityD
 const canvas = document.getElementById('visualizer-canvas');
 const ctx = canvas.getContext('2d');
 const fileInput = document.getElementById('audio-upload');
+const soundModal = document.getElementById('sound-modal');
+const btnCustomAudio = document.getElementById('btn-custom-audio');
+const btnBuiltinAudio = document.getElementById('btn-builtin-audio');
+const btnCancelSound = document.getElementById('btn-cancel-sound');
+const sourceChoice = document.getElementById('source-choice');
+const builtinSelection = document.getElementById('built-in-selection');
+const builtinList = document.getElementById('built-in-list');
+const btnBackToSource = document.getElementById('btn-back-to-source');
+const labelDetail = document.getElementById('label-detail');
+
 const fileNameDisplay = document.getElementById('file-name');
 const playBtn = document.getElementById('btn-play');
 const pauseBtn = document.getElementById('btn-pause');
@@ -67,6 +77,7 @@ const btnTogglePanel = document.getElementById('btn-toggle-panel');
 const sidePanel = document.getElementById('side-panel');
 const btnAddViz = document.getElementById('btn-add-viz');
 const btnSelectAll = document.getElementById('btn-select-all');
+const btnSelectAllRecs = document.getElementById('btn-select-all-recs');
 const layersList = document.getElementById('layers-list');
 
 // Layer State
@@ -112,6 +123,25 @@ let recordings = []; // { id, url, name, blob }
 
 let animationId;
 let isSeeking = false;
+let countdownInterval; // Global to allow clearing on exit
+let wasSidePanelOpen = false; // Track side panel state
+let lastSelectedLayerIndex = -1; // For range selection
+let lastSelectedRecIndex = -1; // For range selection
+
+const detailLevels = {
+  1: 'Very Low',
+  2: 'Low',
+  3: 'Med',
+  4: 'High',
+  5: 'Ultra',
+  6: 'Max'
+};
+
+const builtInTracks = [
+  { name: 'Chill Beats', url: '/audio/chill beats.mp3' },
+  { name: 'Odd Ambience', url: '/audio/odd ambience.mp3' },
+  { name: 'Peaceful Soundtrack', url: '/audio/peaceful soundtrack.mp3' }
+];
 
 // Visualizer Map
 const visualizers = {
@@ -204,13 +234,36 @@ function renderLayersList() {
         layer.markedForDelete = !layer.markedForDelete;
         renderLayersList();
       } else {
-        // Standard Select
-        layer.selected = !layer.selected;
+        // Clear recordings selection when selecting layers
+        recordings.forEach(r => r.selected = false);
+        renderRecordingsList();
 
-        // Update currentViz and settings visibility when layer is selected
-        if (layer.selected) {
-          currentViz = layer.type;
-          // Update settings panel if it's open
+        const isCtrl = e.ctrlKey || e.metaKey;
+        const isShift = e.shiftKey;
+
+        if (isShift && lastSelectedLayerIndex !== -1) {
+          // Range selection
+          const start = Math.min(index, lastSelectedLayerIndex);
+          const end = Math.max(index, lastSelectedLayerIndex);
+          layers.forEach((l, i) => {
+            if (i >= start && i <= end) l.selected = true;
+          });
+        } else if (isCtrl) {
+          // Toggle
+          layer.selected = !layer.selected;
+        } else {
+          // Single
+          layers.forEach(l => l.selected = false);
+          layer.selected = true;
+        }
+
+        if (layer.selected) lastSelectedLayerIndex = index;
+        else lastSelectedLayerIndex = -1;
+
+        // Update currentViz and settings visibility if a layer is selected
+        const anySelected = layers.find(l => l.selected);
+        if (anySelected) {
+          currentViz = anySelected.type;
           if (!settingsPanel.classList.contains('hidden')) {
             updateSettingsVisibility();
           }
@@ -434,91 +487,140 @@ btnTogglePanel.addEventListener('click', () => {
 btnAddViz.addEventListener('click', addLayer);
 
 btnSelectAll.addEventListener('click', () => {
+  // Deselect all recordings first for mutual exclusivity
+  recordings.forEach(r => r.selected = false);
+  renderRecordingsList();
+
   const allSelected = layers.every(l => l.selected);
   layers.forEach(l => l.selected = !allSelected);
+  updateUI();
   renderLayersList();
 });
 
 
+// Sound Modal Logic
+function openSoundModal() {
+  const selectedLayers = layers.filter(l => l.selected);
+  if (selectedLayers.length === 0) {
+    alert('Please select a layer to assign audio to.');
+    return;
+  }
+  soundModal.classList.add('active');
+  resetModalView();
+}
+
+function closeSoundModal() {
+  soundModal.classList.remove('active');
+}
+
+function resetModalView() {
+  sourceChoice.style.display = 'flex';
+  builtinSelection.style.display = 'none';
+}
+
+btnCustomAudio.addEventListener('click', () => {
+  fileInput.click();
+  closeSoundModal();
+});
+
+btnBuiltinAudio.addEventListener('click', () => {
+  sourceChoice.style.display = 'none';
+  builtinSelection.style.display = 'block';
+  renderBuiltinTracks();
+});
+
+btnCancelSound.addEventListener('click', closeSoundModal);
+btnBackToSource.addEventListener('click', resetModalView);
+
+function renderBuiltinTracks() {
+  builtinList.innerHTML = '';
+  builtInTracks.forEach(track => {
+    const item = document.createElement('div');
+    item.className = 'track-item';
+    item.textContent = track.name;
+    item.onclick = () => {
+      assignBuiltinTrack(track);
+      closeSoundModal();
+    };
+    builtinList.appendChild(item);
+  });
+}
+
+async function assignBuiltinTrack(track) {
+  const selectedLayers = layers.filter(l => l.selected);
+  for (const layer of selectedLayers) {
+    await loadAudioToLayer(layer, track.url, track.name);
+  }
+  renderLayersList();
+}
+
+// Logic extracted from fileInput listener for reuse
+async function loadAudioToLayer(layer, url, name) {
+  try {
+    if (layer.audio) {
+      layer.audio.pause();
+      layer.audio.src = '';
+    }
+    if (layer.source) try { layer.source.disconnect(); } catch (e) { }
+    if (layer.analyser) try { layer.analyser.disconnect(); } catch (e) { }
+
+    await audioEngine.init();
+    const actx = audioEngine.audioContext;
+    if (actx.state === 'suspended') await actx.resume();
+
+    const audio = new Audio(url);
+    audio.loop = btnLoop.classList.contains('active');
+
+    await new Promise((resolve, reject) => {
+      audio.addEventListener('canplaythrough', resolve, { once: true });
+      audio.addEventListener('error', reject, { once: true });
+      audio.load();
+    });
+
+    const source = actx.createMediaElementSource(audio);
+    const analyser = actx.createAnalyser();
+    analyser.fftSize = layer.fftSize || 2048;
+
+    source.connect(analyser);
+    analyser.connect(actx.destination);
+
+    layer.audio = audio;
+    layer.source = source;
+    layer.analyser = analyser;
+    layer.dataArray = new Uint8Array(analyser.frequencyBinCount);
+    layer.audioName = name;
+    layer.fileUrl = url;
+  } catch (err) {
+    console.error(`Error loading audio for layer ${layer.id}:`, err);
+  }
+}
+
 // UI Event Listeners
+// Intercept direct fileInput click to show modal
+// NOTE: We change the UI to a "Choose Audio" button that triggers the modal
+const originalUploadBtn = document.querySelector('input[type="file"]#audio-upload');
+// Create a proxy button instead
+const proxyBtn = document.createElement('button');
+proxyBtn.textContent = 'Choose Audio';
+proxyBtn.id = 'btn-choose-audio';
+proxyBtn.onclick = openSoundModal;
+originalUploadBtn.parentNode.insertBefore(proxyBtn, originalUploadBtn);
+originalUploadBtn.style.display = 'none';
+
 fileInput.addEventListener('change', async (e) => {
   if (e.target.files.length > 0) {
     const file = e.target.files[0];
     const selectedLayers = layers.filter(l => l.selected);
+    const fileUrl = URL.createObjectURL(file);
 
-    // If no layers selected, prompt user
-    if (selectedLayers.length === 0) {
-      alert('Please select a layer to assign this audio file to.');
-      e.target.value = ''; // Reset file input
-      return;
+    for (const layer of selectedLayers) {
+      await loadAudioToLayer(layer, fileUrl, file.name);
     }
 
     fileNameDisplay.textContent = file.name;
     currentMainFileName = file.name;
-
-    // Load file to each selected layer
-    for (const layer of selectedLayers) {
-      try {
-        // Cleanup existing audio resources
-        if (layer.audio) {
-          layer.audio.pause();
-          layer.audio.src = '';
-        }
-        if (layer.source) {
-          try { layer.source.disconnect(); } catch (e) { /* already disconnected */ }
-        }
-        if (layer.analyser) {
-          try { layer.analyser.disconnect(); } catch (e) { /* already disconnected */ }
-        }
-
-        // We need the audio context from the engine
-        await audioEngine.init();
-        const actx = audioEngine.audioContext;
-
-        if (actx.state === 'suspended') {
-          await actx.resume();
-        }
-
-        // Create blob URL for the file
-        const fileUrl = URL.createObjectURL(file);
-
-        // Create Audio element for this layer
-        const audio = new Audio(fileUrl);
-        audio.loop = false;
-
-        // Wait for audio to be loadable
-        await new Promise((resolve, reject) => {
-          audio.addEventListener('canplaythrough', resolve, { once: true });
-          audio.addEventListener('error', reject, { once: true });
-          audio.load();
-        });
-
-        // Create audio graph
-        const source = actx.createMediaElementSource(audio);
-        const analyser = actx.createAnalyser();
-        analyser.fftSize = 2048;
-
-        // Connect: source -> analyser -> destination
-        source.connect(analyser);
-        analyser.connect(actx.destination);
-
-        // Store in layer
-        layer.audio = audio;
-        layer.source = source;
-        layer.analyser = analyser;
-        layer.dataArray = new Uint8Array(analyser.frequencyBinCount);
-        layer.audioName = file.name;
-        layer.fileUrl = fileUrl;
-
-        console.log(`Assigned ${file.name} to layer ${layer.id}`);
-      } catch (err) {
-        console.error(`Error loading file for layer ${layer.id}:`, err);
-        alert(`Error loading audio file: ${err.message}`);
-      }
-    }
-
     renderLayersList();
-    e.target.value = ''; // Reset file input for future selections
+    e.target.value = '';
   }
 });
 
@@ -621,6 +723,12 @@ function startRecording() {
 function stopRecording() {
   if (mediaRecorder && isRecording) {
     mediaRecorder.stop();
+    // Turn off mic by default after recording stops
+    if (audioEngine.isMicActive) {
+      audioEngine.stopMic();
+      btnMicToggle.textContent = '🎤 Mic: OFF';
+      btnMicToggle.classList.remove('active');
+    }
   }
 }
 
@@ -716,36 +824,75 @@ function getSelectedLayerWithAudio() {
 let currentMainFileName = 'No file loaded';
 
 function updateUI() {
-  const selectedLayer = getSelectedLayerWithAudio();
+  const selectedLayers = layers.filter(l => l.selected);
+  const selectedRecs = recordings.filter(r => r.selected);
 
-  if (selectedLayer) {
-    // Show Layer Time
-    const audio = selectedLayer.audio;
-    if (!isNaN(audio.duration)) {
-      timeDuration.textContent = formatTime(audio.duration);
-      timeCurrent.textContent = formatTime(audio.currentTime);
+  // Update Select All Buttons State
+  const allLayersSelected = layers.length > 0 && layers.every(l => l.selected);
+  if (btnSelectAll) btnSelectAll.textContent = allLayersSelected ? '☑' : '☐';
+
+  const allRecsSelected = recordings.length > 0 && recordings.every(r => r.selected);
+  if (btnSelectAllRecs) btnSelectAllRecs.textContent = allRecsSelected ? '☑' : '☐';
+
+  if (selectedLayers.length === 1) {
+    // Single Layer Selected
+    const layer = selectedLayers[0];
+    if (layer.audio && !isNaN(layer.audio.duration)) {
+      timeDuration.textContent = formatTime(layer.audio.duration);
+      timeCurrent.textContent = formatTime(layer.audio.currentTime);
       if (!isSeeking) {
-        seekBar.max = audio.duration;
-        seekBar.value = audio.currentTime;
+        seekBar.max = layer.audio.duration;
+        seekBar.value = layer.audio.currentTime;
+      }
+    } else {
+      timeDuration.textContent = '0:00';
+      timeCurrent.textContent = '0:00';
+      seekBar.value = 0;
+    }
+    const safeLayerName = layer.customName || layer.type;
+    const safeFileName = layer.audioName || 'No Audio';
+    fileNameDisplay.textContent = `${safeLayerName} (${safeFileName})`;
+  } else if (selectedLayers.length > 1) {
+    // Multiple Layers Selected
+    timeDuration.textContent = '--:--';
+    timeCurrent.textContent = '--:--';
+    fileNameDisplay.textContent = 'Multiple Layers Selected';
+    seekBar.value = 0;
+  } else if (selectedRecs.length === 1) {
+    // Single Recording Selected
+    const rec = selectedRecs[0];
+    if (rec.audio && !isNaN(rec.audio.duration)) {
+      timeDuration.textContent = formatTime(rec.audio.duration);
+      timeCurrent.textContent = formatTime(rec.audio.currentTime);
+      if (!isSeeking) {
+        seekBar.max = rec.audio.duration;
+        seekBar.value = rec.audio.currentTime;
       }
     }
-    // Indicate context in UI (optional, user asked for it)
-    fileNameDisplay.textContent = `Selected: ${selectedLayer.audioName}`;
+    fileNameDisplay.textContent = `${rec.name} (Recording)`;
+  } else if (selectedRecs.length > 1) {
+    // Multiple Recordings Selected
+    timeDuration.textContent = '--:--';
+    timeCurrent.textContent = '--:--';
+    fileNameDisplay.textContent = 'Multiple Recordings Selected';
+    seekBar.value = 0;
   } else if (audioEngine.audioBuffer) {
-    // Show Main Audio Time
+    // Global Audio
     const duration = audioEngine.duration;
     const current = audioEngine.currentTime;
-
     timeDuration.textContent = formatTime(duration);
     timeCurrent.textContent = formatTime(current);
-
-    // Restore main file name
     fileNameDisplay.textContent = currentMainFileName;
-
     if (!isSeeking) {
       seekBar.max = duration;
       seekBar.value = current;
     }
+  } else {
+    // Nothing Selected / Default
+    timeDuration.textContent = '0:00';
+    timeCurrent.textContent = '0:00';
+    fileNameDisplay.textContent = 'No file loaded';
+    seekBar.value = 0;
   }
 }
 
@@ -845,6 +992,17 @@ btnRecDeleteMode.addEventListener('click', () => {
   renderRecordingsList();
 });
 
+btnSelectAllRecs.addEventListener('click', () => {
+  // Deselect all layers first for mutual exclusivity
+  layers.forEach(l => l.selected = false);
+  renderLayersList();
+
+  const allSelected = recordings.length > 0 && recordings.every(r => r.selected);
+  recordings.forEach(r => r.selected = !allSelected);
+  updateUI();
+  renderRecordingsList();
+});
+
 function renderRecordingsList() {
   recordingsList.innerHTML = '';
 
@@ -856,38 +1014,123 @@ function renderRecordingsList() {
   recordings.forEach(rec => {
     const item = document.createElement('div');
     item.className = 'recording-item';
+    if (rec.selected) item.classList.add('selected'); // Add selected state
     if (rec.markedForDelete) item.classList.add('marked');
 
     // Click for Delete Mode
     item.addEventListener('click', (e) => {
-      if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT' || e.target.isContentEditable) return;
+      // Ignore controls and the title itself to allow double-clicks/editing
+      if (
+        e.target.tagName === 'BUTTON' ||
+        e.target.tagName === 'INPUT' ||
+        e.target.classList.contains('recording-name') ||
+        e.target.isContentEditable
+      ) return;
 
       if (isRecDeleteMode) {
         rec.markedForDelete = !rec.markedForDelete;
+        renderRecordingsList();
+      } else {
+        // Clear layers selection when selecting recordings
+        layers.forEach(l => l.selected = false);
+        renderLayersList();
+
+        const isCtrl = e.ctrlKey || e.metaKey;
+        const isShift = e.shiftKey;
+        const index = recordings.indexOf(rec);
+
+        if (isShift && lastSelectedRecIndex !== -1) {
+          const start = Math.min(index, lastSelectedRecIndex);
+          const end = Math.max(index, lastSelectedRecIndex);
+          recordings.forEach((r, i) => {
+            if (i >= start && i <= end) r.selected = true;
+          });
+        } else if (isCtrl) {
+          rec.selected = !rec.selected;
+        } else {
+          recordings.forEach(r => r.selected = false);
+          rec.selected = true;
+        }
+
+        if (rec.selected) lastSelectedRecIndex = index;
+        else lastSelectedRecIndex = -1;
+
+        updateUI();
         renderRecordingsList();
       }
     });
 
     const nameSpan = document.createElement('span');
     nameSpan.className = 'recording-name';
+    nameSpan.id = `rec-title-${rec.id}`; // Add ID to fix form field warning
     nameSpan.textContent = rec.name;
     nameSpan.title = rec.name;
 
-    // Rename
-    nameSpan.ondblclick = () => {
-      nameSpan.contentEditable = true;
+    let isCanceling = false;
+    const enableEditing = () => {
+      isCanceling = false;
+      nameSpan.contentEditable = 'true';
       nameSpan.focus();
+      // Use setTimeout to ensure the element is focusable and attached before selection
+      setTimeout(() => {
+        if (!nameSpan.contentEditable || isCanceling) return;
+        // Check if element is still in DOM
+        if (!document.body.contains(nameSpan)) return;
+
+        try {
+          const range = document.createRange();
+          range.selectNodeContents(nameSpan);
+          const sel = window.getSelection();
+          sel.removeAllRanges();
+          sel.addRange(range);
+        } catch (err) {
+          console.warn("Selection error:", err);
+          // Fallback selection method
+          try {
+            window.getSelection().selectAllChildren(nameSpan);
+          } catch (e2) { }
+        }
+      }, 50); // Increased delay to 50ms for stability
+    };
+
+    // Rename
+    nameSpan.ondblclick = (e) => {
+      e.stopPropagation();
+      enableEditing();
     };
     nameSpan.onblur = () => {
-      nameSpan.contentEditable = false;
+      if (isCanceling) {
+        isCanceling = false;
+        return;
+      }
+      nameSpan.contentEditable = 'false';
       rec.name = nameSpan.textContent;
     };
     nameSpan.onkeydown = (e) => {
-      if (e.key === 'Enter') { e.preventDefault(); nameSpan.blur(); }
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        nameSpan.blur();
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        isCanceling = true;
+        nameSpan.contentEditable = 'false';
+        renderRecordingsList(); // Re-render to restore original name
+      }
     };
 
     const controls = document.createElement('div');
     controls.className = 'recording-controls';
+
+    // Rename Button
+    const btnRename = document.createElement('button');
+    btnRename.className = 'icon-btn';
+    btnRename.textContent = '✎';
+    btnRename.title = 'Rename Recording';
+    btnRename.onclick = (e) => {
+      e.stopPropagation();
+      enableEditing();
+    };
 
     // Mini Player
     if (!rec.audio) {
@@ -956,6 +1199,7 @@ function renderRecordingsList() {
     if (isRecDeleteMode) {
       controls.style.display = 'none'; // Hide controls in delete mode
     } else {
+      controls.appendChild(btnRename);
       controls.appendChild(btnPlay);
       controls.appendChild(btnStop);
       controls.appendChild(slider);
@@ -983,14 +1227,34 @@ function animate() {
   layers.forEach(layer => {
     if (!layer.visible) return;
 
-    let drawDataArray = dataArray; // Default to global
-    let drawBufferLength = bufferLength;
+    let drawDataArray = null;
+    let drawBufferLength = 0;
 
-    // Layer-specific Audio
-    if (layer.analyser && layer.dataArray) {
-      layer.analyser.getByteFrequencyData(layer.dataArray);
-      drawDataArray = layer.dataArray;
-      drawBufferLength = layer.analyser.frequencyBinCount;
+    if (audioEngine.isMicActive) {
+      if (layer.selected) {
+        // Selective Mic: only selected layers get mic data
+        drawDataArray = dataArray;
+        drawBufferLength = bufferLength;
+      } else if (layer.analyser && layer.dataArray) {
+        // Unselected layers with their own audio keep playing it
+        layer.analyser.getByteFrequencyData(layer.dataArray);
+        drawDataArray = layer.dataArray;
+        drawBufferLength = layer.analyser.frequencyBinCount;
+      } else {
+        // Unselected with no audio stay flat
+        drawDataArray = new Uint8Array(bufferLength || 1024);
+        drawBufferLength = drawDataArray.length;
+      }
+    } else {
+      // Mic is OFF: use layer audio or fallback to global file
+      if (layer.analyser && layer.dataArray) {
+        layer.analyser.getByteFrequencyData(layer.dataArray);
+        drawDataArray = layer.dataArray;
+        drawBufferLength = layer.analyser.frequencyBinCount;
+      } else {
+        drawDataArray = dataArray;
+        drawBufferLength = bufferLength;
+      }
     }
 
     // Use layer-specific colors or fall back to global
@@ -1171,16 +1435,47 @@ const rowParticles = document.getElementById('row-particles');
 
 
 function updateSettingsVisibility() {
-  const selectedLayer = layers.find(l => l.selected);
-  if (selectedLayer) currentViz = selectedLayer.type;
-
-  if (currentViz === 'particles') {
-    rowDetail.style.display = 'none';
-    rowParticles.style.display = 'flex';
-  } else {
-    rowDetail.style.display = 'flex';
-    rowParticles.style.display = 'none';
+  const selectedLayers = layers.filter(l => l.selected);
+  if (selectedLayers.length === 0) {
+    rowDetail.classList.add('disabled');
+    rowParticles.classList.add('disabled');
+    return;
   }
+
+  const firstType = selectedLayers[0].type;
+  const allSameType = selectedLayers.every(l => l.type === firstType);
+  currentViz = allSameType ? firstType : 'mixed';
+
+  // Always show both, but disable based on type
+  if (currentViz === 'particles') {
+    rowDetail.classList.add('disabled');
+    rowParticles.classList.remove('disabled');
+  } else if (currentViz === 'mixed') {
+    // Both could be relevant or neither depending on mix, but let's disable for safety in "mixed"
+    rowDetail.classList.add('disabled');
+    rowParticles.classList.add('disabled');
+  } else {
+    rowDetail.classList.remove('disabled');
+    rowParticles.classList.add('disabled');
+  }
+
+  // Update Detail UI
+  const firstFFT = selectedLayers[0].fftSize;
+  const allSameFFT = selectedLayers.every(l => l.fftSize === firstFFT);
+  if (allSameFFT) {
+    const level = Math.log2(firstFFT) - 8;
+    settingDetail.value = level;
+    labelDetail.textContent = detailLevels[level] || 'Custom';
+  } else {
+    settingDetail.value = 3; // Default visual position
+    labelDetail.textContent = '-';
+  }
+
+  // Update Particles UI
+  const firstCount = selectedLayers[0].vizSettings?.particles?.particleCount || 150;
+  const allSameCount = selectedLayers.every(l => (l.vizSettings?.particles?.particleCount || 150) === firstCount);
+  settingParticles.value = allSameCount ? firstCount : 150;
+  settingParticlesInput.value = allSameCount ? firstCount : '-';
 }
 
 btnSettings.addEventListener('click', () => {
@@ -1192,7 +1487,7 @@ btnCloseSettings.addEventListener('click', () => settingsPanel.classList.add('hi
 
 settingDetail.addEventListener('input', (e) => {
   const level = parseInt(e.target.value);
-  // Map level 1-6 to power of 2 (512 - 16384)
+  labelDetail.textContent = detailLevels[level] || 'Custom';
   const fftSize = Math.pow(2, level + 8);
 
   const selected = layers.filter(l => l.selected);
@@ -1201,7 +1496,6 @@ settingDetail.addEventListener('input', (e) => {
       l.fftSize = fftSize;
       if (l.analyser) {
         l.analyser.fftSize = fftSize;
-        // Re-init dataArray if size changed
         l.dataArray = new Uint8Array(l.analyser.frequencyBinCount);
       }
     });
@@ -1249,6 +1543,9 @@ function startRecordingMode() {
   if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen();
   document.body.classList.add('recording-mode');
 
+  wasSidePanelOpen = !sidePanel.classList.contains('hidden'); // Fix Side Panel Restoration
+  sidePanel.classList.add('hidden'); // Fix Record Bug 1
+
   // Pause all
   audioEngine.stop();
   layers.forEach(l => { if (l.audio) { l.audio.pause(); l.audio.currentTime = 0; } });
@@ -1258,12 +1555,12 @@ function startRecordingMode() {
   countdownOverlay.textContent = count;
   exitHint.style.display = 'block';
 
-  const interval = setInterval(() => {
+  countdownInterval = setInterval(() => { // Fix Record Bug 2 & 3
     count--;
     if (count > 0) {
       countdownOverlay.textContent = count;
     } else {
-      clearInterval(interval);
+      clearInterval(countdownInterval);
       countdownOverlay.style.display = 'none';
       exitHint.style.display = 'none';
 
@@ -1271,17 +1568,28 @@ function startRecordingMode() {
       audioEngine.play();
       layers.forEach(l => { if (l.audio) l.audio.play(); });
 
-      document.addEventListener('keydown', handleEsc);
     }
   }, 1000);
 }
 
 function handleEsc(e) {
-  if (e.key === 'Escape') exitRecordingMode();
+  if (e.key === 'Escape') {
+    if (soundModal.classList.contains('active')) {
+      closeSoundModal();
+    } else if (document.body.classList.contains('recording-mode')) {
+      exitRecordingMode();
+    }
+  }
 }
 
+// Global keydown listener
+document.addEventListener('keydown', handleEsc);
+
 function exitRecordingMode() {
-  document.removeEventListener('keydown', handleEsc);
+  clearInterval(countdownInterval); // Fix Record Bug 2 & 3
+
+  if (wasSidePanelOpen) sidePanel.classList.remove('hidden'); // Fix Side Panel Restoration
+
   audioEngine.stop();
   layers.forEach(l => { if (l.audio) l.audio.pause(); });
   document.body.classList.remove('recording-mode');
@@ -1298,3 +1606,13 @@ document.addEventListener('fullscreenchange', () => {
 
 // Start loop
 animate();
+
+// Auto-select first layer on startup
+if (layers.length > 0) {
+  layers[0].selected = true;
+  updateUI();
+  renderLayersList();
+  if (!settingsPanel.classList.contains('hidden')) {
+    updateSettingsVisibility();
+  }
+}

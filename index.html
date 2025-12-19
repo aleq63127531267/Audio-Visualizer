@@ -38,6 +38,7 @@
         <div class="panel-header">
           <h2>Saved Recordings</h2>
           <div class="panel-controls">
+            <button id="btn-select-all-recs" title="Select/Deselect All" class="icon-btn">☑</button>
             <button id="btn-rec-delete-mode" title="Toggle Delete Mode" class="icon-btn">🗑</button>
           </div>
         </div>
@@ -126,14 +127,17 @@
 
       <div id="row-detail" class="color-row" title="Smoothness/Number of Bars">
         <label>Detail Level</label>
-        <input type="range" id="setting-detail" min="1" max="6" value="3" step="1">
+        <div style="display: flex; gap: 10px; align-items: center; flex-grow: 1;">
+          <input type="range" id="setting-detail" min="1" max="6" value="3" step="1" style="flex-grow: 1;">
+          <span id="label-detail" style="width: 70px; text-align: right; font-size: 0.85rem; opacity: 0.8;">Med</span>
+        </div>
       </div>
 
       <div id="row-particles" class="color-row" title="Number of Particles">
         <label>Particle Count</label>
         <div style="display: flex; gap: 10px; align-items: center; flex-grow: 1;">
           <input type="range" id="setting-particles" min="50" max="500" value="150" step="10" style="flex-grow: 1;">
-          <input type="number" id="setting-particles-input" min="1" value="150" style="width: 60px;">
+          <input type="text" id="setting-particles-input" value="150" style="width: 60px; text-align: center;">
         </div>
       </div>
 
@@ -143,6 +147,24 @@
 
   <div id="countdown-overlay"></div>
   <div id="exit-hint">Press ESC to Stop</div>
+
+  <div id="sound-modal" class="modal-overlay">
+    <div class="modal-content">
+      <h3>Choose Audio Source</h3>
+      <div id="source-choice" class="modal-options">
+        <button id="btn-custom-audio" class="modal-btn">Upload Custom Audio</button>
+        <button id="btn-builtin-audio" class="modal-btn primary">Use Built-in Audio</button>
+        <button id="btn-cancel-sound" class="modal-btn">Cancel</button>
+      </div>
+      <div id="built-in-selection" style="display: none;">
+        <h3>Select Track</h3>
+        <div id="built-in-list">
+          <!-- Tracks injected by JS -->
+        </div>
+        <button id="btn-back-to-source" class="modal-btn" style="width: 100%; margin-top: 15px;">Back</button>
+      </div>
+    </div>
+  </div>
 
   <script type="module" src="/src/main.js"></script>
 </body>
