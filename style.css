@@ -601,6 +601,12 @@ body.recording-mode {
   gap: 15px;
 }
 
+#alert-message {
+  line-height: 1.5;
+  margin-bottom: 10px;
+  color: #ccc;
+}
+
 .modal-btn {
   background: #2a2a2a;
   color: #fff;

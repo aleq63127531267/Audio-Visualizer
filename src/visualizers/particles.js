@@ -105,6 +105,14 @@ export function drawParticles(ctx, canvas, dataArray, bufferLength, vizColors, l
         layer.vizState.lastParticleCount = particleCount;
     }
 
+    // Check if base size changed
+    if (layer.vizState.lastBaseSize !== baseSize) {
+        layer.vizState.particles.forEach(p => {
+            p.baseSize = Math.random() * baseSize + 1;
+        });
+        layer.vizState.lastBaseSize = baseSize;
+    }
+
     // Use pre-sorted stops from vizColors if available
     const sortedStops = vizColors.sortedStops ||
         [...vizColors.stops].sort((a, b) => a.offset - b.offset);
@@ -176,6 +184,18 @@ export function setParticleCount(count, canvas, layer) {
     if (layer.vizState?.particles) {
         adjustParticleCount(layer, canvas, count, layer.vizSettings.particles.baseSize);
     }
+}
+
+/**
+ * Set particle size for a specific layer
+ */
+export function setParticleSize(size, layer) {
+    if (!layer) return;
+
+    if (!layer.vizSettings) layer.vizSettings = {};
+    if (!layer.vizSettings.particles) layer.vizSettings.particles = { ...DEFAULTS };
+
+    layer.vizSettings.particles.baseSize = size;
 }
 
 /**

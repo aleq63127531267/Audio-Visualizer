@@ -5,7 +5,9 @@ const DEFAULTS = {
     nodeCount: 80,
     connectDist: 150,
     speed: 1.0,
-    pulseStrength: 0.8
+    pulseStrength: 0.8,
+    baseSize: 2,
+    lineWeight: 1
 };
 
 /**
@@ -25,6 +27,8 @@ export function drawProximityDots(ctx, canvas, dataArray, bufferLength, vizColor
     const CONNECT_DIST = settings.connectDist || DEFAULTS.connectDist;
     const SPEED = settings.speed || DEFAULTS.speed;
     const PULSE = settings.pulseStrength || DEFAULTS.pulseStrength;
+    const BASE_SIZE = settings.baseSize || DEFAULTS.baseSize;
+    const LINE_WEIGHT = settings.lineWeight || DEFAULTS.lineWeight;
 
     // Init State
     if (!layer.vizState || !layer.vizState.nodes ||
@@ -47,7 +51,9 @@ export function drawProximityDots(ctx, canvas, dataArray, bufferLength, vizColor
                 y: Math.random() * height,
                 vx: (Math.random() - 0.5) * 1.5 * SPEED,
                 vy: (Math.random() - 0.5) * 1.5 * SPEED,
-                size: Math.random() * 2 + 1,
+                size: Math.random() * 2 + 1, // This will be multiplied by BASE_SIZE later? 
+                // Let's make it more consistent with BASE_SIZE.
+                relativeSize: Math.random() * 0.5 + 0.5, // 0.5 to 1.0
                 colorIndex: Math.floor(Math.random() * stopCount)
             });
         }
@@ -95,7 +101,7 @@ export function drawProximityDots(ctx, canvas, dataArray, bufferLength, vizColor
 
 
     // Draw Connections
-    ctx.lineWidth = 1;
+    ctx.lineWidth = LINE_WEIGHT;
 
     // Predetermine RGBs for stops for efficiency. 
     // FALLBACK if vizColors.stops is missing or empty
@@ -108,7 +114,8 @@ export function drawProximityDots(ctx, canvas, dataArray, bufferLength, vizColor
 
         // Draw Node
         ctx.beginPath();
-        ctx.arc(nodeA.x, nodeA.y, nodeA.size * pulseFactor, 0, Math.PI * 2);
+        const drawSize = (nodeA.relativeSize || 1) * BASE_SIZE * pulseFactor;
+        ctx.arc(nodeA.x, nodeA.y, drawSize, 0, Math.PI * 2);
         ctx.fillStyle = colorA;
         ctx.fill();
 
@@ -154,4 +161,23 @@ export function scaleProximityNodes(oldW, oldH, newW, newH, layer) {
         node.x *= scaleX;
         node.y *= scaleY;
     });
+}
+/**
+ * Set node size for a specific layer
+ */
+export function setNodeSize(size, layer) {
+    if (!layer) return;
+    if (!layer.vizSettings) layer.vizSettings = {};
+    if (!layer.vizSettings.proximityDots) layer.vizSettings.proximityDots = { ...DEFAULTS };
+    layer.vizSettings.proximityDots.baseSize = size;
+}
+
+/**
+ * Set line weight for a specific layer
+ */
+export function setLineWeight(weight, layer) {
+    if (!layer) return;
+    if (!layer.vizSettings) layer.vizSettings = {};
+    if (!layer.vizSettings.proximityDots) layer.vizSettings.proximityDots = { ...DEFAULTS };
+    layer.vizSettings.proximityDots.lineWeight = weight;
 }

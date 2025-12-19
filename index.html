@@ -141,6 +141,22 @@
         </div>
       </div>
 
+      <div id="row-particle-size" class="color-row" title="Size of Particles/Nodes">
+        <label>Element Size</label>
+        <div style="display: flex; gap: 10px; align-items: center; flex-grow: 1;">
+          <input type="range" id="setting-particle-size" min="1" max="10" value="2" step="0.5" style="flex-grow: 1;">
+          <input type="text" id="setting-particle-size-input" value="2" style="width: 60px; text-align: center;">
+        </div>
+      </div>
+
+      <div id="row-line-weight" class="color-row" title="Line thickness for connections">
+        <label>Line Weight</label>
+        <div style="display: flex; gap: 10px; align-items: center; flex-grow: 1;">
+          <input type="range" id="setting-line-weight" min="1" max="10" value="1" step="0.5" style="flex-grow: 1;">
+          <input type="text" id="setting-line-weight-input" value="1" style="width: 60px; text-align: center;">
+        </div>
+      </div>
+
       <button id="btn-close-settings">Close</button>
     </div>
   </div>
@@ -163,6 +179,14 @@
         </div>
         <button id="btn-back-to-source" class="modal-btn" style="width: 100%; margin-top: 15px;">Back</button>
       </div>
+    </div>
+  </div>
+
+  <div id="alert-modal" class="modal-overlay">
+    <div class="modal-content">
+      <h3 id="alert-title">Notification</h3>
+      <p id="alert-message">This is a message.</p>
+      <button id="btn-alert-ok" class="modal-btn primary">OK</button>
     </div>
   </div>
 

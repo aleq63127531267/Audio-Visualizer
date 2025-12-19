@@ -2,8 +2,8 @@ import { AudioEngine } from './audio.js';
 import { drawBars, invalidateBarsCache } from './visualizers/bars.js';
 import { drawCircle, invalidateCircleCache } from './visualizers/circle.js';
 import { drawCircleLinear, invalidateCircleLinearCache } from './visualizers/circle-linear.js';
-import { drawParticles, scaleParticles, setParticleCount } from './visualizers/particles.js';
-import { drawProximityDots, scaleProximityNodes } from './visualizers/proximityDots.js';
+import { drawParticles, scaleParticles, setParticleCount, setParticleSize } from './visualizers/particles.js';
+import { drawProximityDots, scaleProximityNodes, setNodeSize, setLineWeight } from './visualizers/proximityDots.js';
 
 const canvas = document.getElementById('visualizer-canvas');
 const ctx = canvas.getContext('2d');
@@ -16,6 +16,10 @@ const sourceChoice = document.getElementById('source-choice');
 const builtinSelection = document.getElementById('built-in-selection');
 const builtinList = document.getElementById('built-in-list');
 const btnBackToSource = document.getElementById('btn-back-to-source');
+
+const alertModal = document.getElementById('alert-modal');
+const alertMessage = document.getElementById('alert-message');
+const btnAlertOk = document.getElementById('btn-alert-ok');
 const labelDetail = document.getElementById('label-detail');
 
 const fileNameDisplay = document.getElementById('file-name');
@@ -502,7 +506,7 @@ btnSelectAll.addEventListener('click', () => {
 function openSoundModal() {
   const selectedLayers = layers.filter(l => l.selected);
   if (selectedLayers.length === 0) {
-    alert('Please select a layer to assign audio to.');
+    showAlert('Please select a layer to assign audio to.');
     return;
   }
   soundModal.classList.add('active');
@@ -682,7 +686,7 @@ btnMicToggle.addEventListener('click', async () => {
 // Recording Logic
 function startRecording() {
   if (!audioEngine.micStream) {
-    alert('No microphone stream active.');
+    showAlert('No microphone stream active.');
     return;
   }
 
@@ -754,7 +758,7 @@ btnRecordMic.addEventListener('click', async () => {
 function assignRecordingToLayer(recUrl, recName) {
   const selectedLayers = layers.filter(l => l.selected);
   if (selectedLayers.length === 0) {
-    alert('Please select a layer to assign this recording to.');
+    showAlert('Please select a layer to assign this recording to.');
     return;
   }
 
@@ -808,7 +812,7 @@ function assignRecordingToLayer(recUrl, recName) {
       console.log(`Assigned ${recName} to Layer ${layer.id}`);
     } catch (error) {
       console.error(`Error assigning ${recName} to layer:`, error);
-      alert(`Failed to play audio: ${error.message}`);
+      showAlert(`Failed to play audio: ${error.message}`);
     }
   });
 
@@ -905,7 +909,11 @@ playBtn.addEventListener('click', () => {
     if (audioEngine.audioBuffer) {
       audioEngine.play();
     } else {
-      alert("Please upload a file first.");
+      const hasAnyAudio = layers.some(l => l.audio) || audioEngine.audioBuffer;
+      if (!hasAnyAudio) {
+        showAlert("Please upload a file first.");
+        return;
+      }
       fileInput.click();
     }
   }
@@ -1144,12 +1152,18 @@ function renderRecordingsList() {
     btnPlay.textContent = !rec.audio.paused ? '⏸' : '▶';
     btnPlay.onclick = () => {
       if (rec.audio.paused) {
+        // Stop all other recordings (Minor Improvement #3)
+        recordings.forEach(r => {
+          if (r !== rec && r.audio && !r.audio.paused) {
+            r.audio.pause();
+            r.audio.currentTime = 0; // Reset progress bar (Refinement #58)
+          }
+        });
         rec.audio.play();
-        btnPlay.textContent = '⏸';
       } else {
         rec.audio.pause();
-        btnPlay.textContent = '▶';
       }
+      renderRecordingsList(); // Single re-render to update all icons correctly
     };
 
     rec.audio.onended = () => {
@@ -1430,6 +1444,12 @@ const settingParticles = document.getElementById('setting-particles');
 const settingParticlesInput = document.getElementById('setting-particles-input');
 const rowDetail = document.getElementById('row-detail');
 const rowParticles = document.getElementById('row-particles');
+const rowParticleSize = document.getElementById('row-particle-size');
+const settingParticleSize = document.getElementById('setting-particle-size');
+const settingParticleSizeInput = document.getElementById('setting-particle-size-input');
+const rowLineWeight = document.getElementById('row-line-weight');
+const settingLineWeight = document.getElementById('setting-line-weight');
+const settingLineWeightInput = document.getElementById('setting-line-weight-input');
 
 // Settings Logic
 
@@ -1439,6 +1459,8 @@ function updateSettingsVisibility() {
   if (selectedLayers.length === 0) {
     rowDetail.classList.add('disabled');
     rowParticles.classList.add('disabled');
+    rowParticleSize.classList.add('disabled');
+    rowLineWeight.classList.add('disabled');
     return;
   }
 
@@ -1450,13 +1472,24 @@ function updateSettingsVisibility() {
   if (currentViz === 'particles') {
     rowDetail.classList.add('disabled');
     rowParticles.classList.remove('disabled');
+    rowParticleSize.classList.remove('disabled');
+    rowLineWeight.classList.add('disabled');
+  } else if (currentViz === 'proximityDots') {
+    rowDetail.classList.add('disabled');
+    rowParticles.classList.add('disabled');
+    rowParticleSize.classList.remove('disabled');
+    rowLineWeight.classList.remove('disabled');
   } else if (currentViz === 'mixed') {
     // Both could be relevant or neither depending on mix, but let's disable for safety in "mixed"
     rowDetail.classList.add('disabled');
     rowParticles.classList.add('disabled');
+    rowParticleSize.classList.add('disabled');
+    rowLineWeight.classList.add('disabled');
   } else {
     rowDetail.classList.remove('disabled');
     rowParticles.classList.add('disabled');
+    rowParticleSize.classList.add('disabled');
+    rowLineWeight.classList.add('disabled');
   }
 
   // Update Detail UI
@@ -1476,6 +1509,26 @@ function updateSettingsVisibility() {
   const allSameCount = selectedLayers.every(l => (l.vizSettings?.particles?.particleCount || 150) === firstCount);
   settingParticles.value = allSameCount ? firstCount : 150;
   settingParticlesInput.value = allSameCount ? firstCount : '-';
+
+  // Update Particle Size UI
+  const firstSize = selectedLayers[0].type === 'particles'
+    ? (selectedLayers[0].vizSettings?.particles?.baseSize || 3)
+    : (selectedLayers[0].vizSettings?.proximityDots?.baseSize || 2);
+
+  const allSameSize = selectedLayers.every(l => {
+    const size = l.type === 'particles'
+      ? (l.vizSettings?.particles?.baseSize || 3)
+      : (l.vizSettings?.proximityDots?.baseSize || 2);
+    return size === firstSize;
+  });
+  settingParticleSize.value = allSameSize ? firstSize : 2;
+  settingParticleSizeInput.value = allSameSize ? firstSize : '-';
+
+  // Update Line Weight UI
+  const firstWeight = selectedLayers[0].vizSettings?.proximityDots?.lineWeight || 1;
+  const allSameWeight = selectedLayers.every(l => (l.vizSettings?.proximityDots?.lineWeight || 1) === firstWeight);
+  settingLineWeight.value = allSameWeight ? firstWeight : 1;
+  settingLineWeightInput.value = allSameWeight ? firstWeight : '-';
 }
 
 btnSettings.addEventListener('click', () => {
@@ -1529,11 +1582,65 @@ settingParticlesInput.addEventListener('input', (e) => {
   }
 });
 
+function updateParticleSizeSafe(val) {
+  if (isNaN(val) || val < 0.1) return;
+  const targetLayers = layers.filter(l => l.selected && (l.type === 'particles' || l.type === 'proximityDots'));
+
+  if (targetLayers.length === 0) {
+    // Apply to all if none selected? Consistent with previous logic
+    layers.filter(l => l.type === 'particles').forEach(layer => setParticleSize(val, layer));
+    layers.filter(l => l.type === 'proximityDots').forEach(layer => setNodeSize(val, layer));
+  } else {
+    targetLayers.forEach(layer => {
+      if (layer.type === 'particles') setParticleSize(val, layer);
+      if (layer.type === 'proximityDots') setNodeSize(val, layer);
+    });
+  }
+}
+
+settingParticleSize.addEventListener('input', (e) => {
+  const val = parseFloat(e.target.value);
+  settingParticleSizeInput.value = val;
+  updateParticleSizeSafe(val);
+});
+
+settingParticleSizeInput.addEventListener('input', (e) => {
+  const val = parseFloat(e.target.value);
+  if (!isNaN(val) && val > 0) {
+    settingParticleSize.value = val;
+    updateParticleSizeSafe(val);
+  }
+});
+
+function updateLineWeightSafe(val) {
+  if (isNaN(val) || val < 0.1) return;
+  const proximityLayers = layers.filter(l => l.selected && l.type === 'proximityDots');
+  if (proximityLayers.length === 0) {
+    layers.filter(l => l.type === 'proximityDots').forEach(layer => setLineWeight(val, layer));
+  } else {
+    proximityLayers.forEach(layer => setLineWeight(val, layer));
+  }
+}
+
+settingLineWeight.addEventListener('input', (e) => {
+  const val = parseFloat(e.target.value);
+  settingLineWeightInput.value = val;
+  updateLineWeightSafe(val);
+});
+
+settingLineWeightInput.addEventListener('input', (e) => {
+  const val = parseFloat(e.target.value);
+  if (!isNaN(val) && val > 0) {
+    settingLineWeight.value = val;
+    updateLineWeightSafe(val);
+  }
+});
+
 // Recording Mode
 btnRecord.addEventListener('click', () => {
   const hasAudio = layers.some(l => l.audio) || audioEngine.audioBuffer;
   if (!hasAudio) {
-    alert("Please upload an audio file first.");
+    showAlert("Please upload an audio file first.");
     return;
   }
   startRecordingMode();
@@ -1576,6 +1683,8 @@ function handleEsc(e) {
   if (e.key === 'Escape') {
     if (soundModal.classList.contains('active')) {
       closeSoundModal();
+    } else if (alertModal.classList.contains('active')) {
+      closeAlert();
     } else if (document.body.classList.contains('recording-mode')) {
       exitRecordingMode();
     }
@@ -1603,6 +1712,18 @@ document.addEventListener('fullscreenchange', () => {
     exitRecordingMode();
   }
 });
+
+// Custom Alert System
+function showAlert(message) {
+  alertMessage.textContent = message;
+  alertModal.classList.add('active');
+}
+
+function closeAlert() {
+  alertModal.classList.remove('active');
+}
+
+btnAlertOk.addEventListener('click', closeAlert);
 
 // Start loop
 animate();
