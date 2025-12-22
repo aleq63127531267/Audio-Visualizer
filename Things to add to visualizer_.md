@@ -31,7 +31,7 @@
 5. Automatically disable mic input when stopping recording
 6. recording layers don't show what file is uploaded to them
 7. Clicking the loop button after the file finishes playing causes the bar to continue moving
-8. Make “proximity dots” more sensitive by default
+8. Make “constellation” more sensitive by default
 9. Organization of layers by dragging from a drag icon on the left of the layer (one at a time for now)
 10. Whenever a pop-up happens (please select a layer, etc) make a custom popup for the website instead of using the browser's alert function (or whatever is being used right now)
 
@@ -48,7 +48,7 @@
 4. Global play/pause/stop buttons to toggle every layer.
 5. new “multi gradient” coloring mode where you can make multiple gradients and just like the regular gradient coloring mode there's a bar but you can move the individual gradients across it
 6. Visualizer: simply flashes the screen (based on average frequency if its too low it wont flash)
-7. visualizer: “crystal wall” visualizer (similar to proximity dots), but the dots aren't visible, they connect if they are within a certain distance, whenever there is a closed shape (triangle, 4 sided shapes, ect) and the shapes color changes with the frequency or with its middle point. (ask about more detailed info if you are confused)
+7. visualizer: “crystal wall” visualizer (similar to constellation), but the dots aren't visible, they connect if they are within a certain distance, whenever there is a closed shape (triangle, 4 sided shapes, ect) and the shapes color changes with the frequency or with its middle point. (ask about more detailed info if you are confused)
 8. Add backgrounds, image, visualizer, etc (think more in depth later)
 9. “Intensity” setting (changes how sensitive the visualizer is)
 10. when opening the page it gives a short tutorial on how the site works, a window with text will explain with an x in the corner to close it and a continue button

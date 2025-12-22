@@ -3,7 +3,8 @@ import { hexToRgbString, getColorFromStops, getMultiGradientColor } from '../uti
 // Default settings
 const DEFAULTS = {
     particleCount: 150,
-    baseSize: 3
+    baseSize: 3,
+    nodeSpeed: 1.0
 };
 
 class Particle {
@@ -20,9 +21,9 @@ class Particle {
         this.color = '#ffffff';
     }
 
-    update(frequencyData, bufferLength, vizColors, sortedStops, particleCount, intensity = 1.0) {
-        this.x += this.speedX * intensity;
-        this.y += this.speedY * intensity;
+    update(frequencyData, bufferLength, vizColors, sortedStops, particleCount, intensity = 1.0, nodeSpeed = 1.0) {
+        this.x += this.speedX * intensity * nodeSpeed;
+        this.y += this.speedY * intensity * nodeSpeed;
 
         // Wrap
         if (this.x < 0) this.x = this.canvas.width;
@@ -83,6 +84,7 @@ export function drawParticles(ctx, canvas, dataArray, bufferLength, vizColors, l
     const particleCount = settings.particleCount || DEFAULTS.particleCount;
     const baseSize = settings.baseSize || DEFAULTS.baseSize;
     const INTENSITY = settings.intensity || 1.0;
+    const NODE_SPEED = settings.nodeSpeed || DEFAULTS.nodeSpeed;
 
     // Initialize State if needed
     if (!layer.vizState || !layer.vizState.particles) {
@@ -117,7 +119,7 @@ export function drawParticles(ctx, canvas, dataArray, bufferLength, vizColors, l
         [...vizColors.stops].sort((a, b) => a.offset - b.offset);
 
     particles.forEach(p => {
-        p.update(dataArray, bufferLength, vizColors, sortedStops, particleCount, INTENSITY);
+        p.update(dataArray, bufferLength, vizColors, sortedStops, particleCount, INTENSITY, NODE_SPEED);
         p.draw(ctx);
     });
 }
@@ -195,6 +197,13 @@ export function setParticleSize(size, layer) {
     if (!layer.vizSettings.particles) layer.vizSettings.particles = { ...DEFAULTS };
 
     layer.vizSettings.particles.baseSize = size;
+}
+
+export function setNodeSpeed(val, layer) {
+    if (!layer) return;
+    if (!layer.vizSettings) layer.vizSettings = {};
+    if (!layer.vizSettings.particles) layer.vizSettings.particles = { ...DEFAULTS };
+    layer.vizSettings.particles.nodeSpeed = val;
 }
 
 /**

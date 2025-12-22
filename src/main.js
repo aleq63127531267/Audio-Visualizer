@@ -2,10 +2,10 @@ import { AudioEngine } from './audio.js';
 import { drawBars, invalidateBarsCache } from './visualizers/bars.js';
 import { drawCircle, invalidateCircleCache } from './visualizers/circle.js';
 import { drawCircleLinear, invalidateCircleLinearCache } from './visualizers/circle-linear.js';
-import { drawParticles, scaleParticles, setParticleCount, setParticleSize } from './visualizers/particles.js';
-import { drawProximityDots, scaleProximityNodes, setNodeSize, setLineWeight, setIntensity } from './visualizers/proximityDots.js';
+import { drawParticles, scaleParticles, setParticleCount, setParticleSize, setNodeSpeed as setParticleNodeSpeed } from './visualizers/particles.js';
+import { drawConstellation, scaleConstellationNodes, setConstellationNodeSize, setConstellationLineWeight, setConstellationIntensity, setConstellationNodeSpeed } from './visualizers/constellation.js';
 import { drawFlash } from './visualizers/flash.js';
-import { drawCrystalWall } from './visualizers/crystalWall.js';
+import { drawCrystalWall, setAnchorSpeed, setNodeSpeed as setCrystalNodeSpeed } from './visualizers/crystalWall.js';
 
 const canvas = document.getElementById('visualizer-canvas');
 const ctx = canvas.getContext('2d');
@@ -61,8 +61,8 @@ function resize() {
     if (layer.type === 'particles' && layer.vizState?.particles) {
       scaleParticles(oldW, oldH, newW, newH, layer);
     }
-    if (layer.type === 'proximityDots' && layer.vizState?.nodes) {
-      scaleProximityNodes(oldW, oldH, newW, newH, layer);
+    if (layer.type === 'constellation' && layer.vizState?.nodes) {
+      scaleConstellationNodes(oldW, oldH, newW, newH, layer);
     }
   });
 
@@ -156,7 +156,7 @@ const visualizers = {
   'circle': drawCircle,
   'circle-linear': drawCircleLinear,
   'particles': drawParticles,
-  'proximityDots': drawProximityDots,
+  'constellation': drawConstellation,
   'flash': drawFlash,
   'crystalWall': drawCrystalWall
 };
@@ -1633,6 +1633,15 @@ const rowIntensity = document.getElementById('row-intensity');
 const settingIntensity = document.getElementById('setting-intensity');
 const settingIntensityInput = document.getElementById('setting-intensity-input');
 
+const rowNodeSpeed = document.getElementById('row-node-speed');
+const settingNodeSpeed = document.getElementById('setting-node-speed');
+const settingNodeSpeedInput = document.getElementById('setting-node-speed-input');
+
+const rowAnchorSpeed = document.getElementById('row-anchor-speed');
+const settingAnchorSpeed = document.getElementById('setting-anchor-speed');
+const settingAnchorSpeedInput = document.getElementById('setting-anchor-speed-input');
+
+
 // Settings Logic
 
 
@@ -1644,6 +1653,8 @@ function updateSettingsVisibility() {
     rowParticleSize.classList.add('disabled');
     rowLineWeight.classList.add('disabled');
     rowIntensity.classList.add('disabled');
+    rowNodeSpeed.classList.add('disabled');
+    rowAnchorSpeed.classList.add('disabled');
     return;
   }
 
@@ -1658,31 +1669,49 @@ function updateSettingsVisibility() {
     rowParticleSize.classList.remove('disabled');
     rowLineWeight.classList.add('disabled');
     rowIntensity.classList.remove('disabled');
-  } else if (currentViz === 'proximityDots') {
+    rowNodeSpeed.classList.remove('disabled');
+    rowAnchorSpeed.classList.add('disabled');
+  } else if (currentViz === 'constellation') {
     rowDetail.classList.add('disabled');
     rowParticles.classList.add('disabled');
     rowParticleSize.classList.remove('disabled');
     rowLineWeight.classList.remove('disabled');
     rowIntensity.classList.remove('disabled');
+    rowNodeSpeed.classList.remove('disabled');
+    rowAnchorSpeed.classList.add('disabled');
   } else if (currentViz === 'crystalWall') {
     rowDetail.classList.add('disabled');
     rowParticles.classList.add('disabled');
     rowParticleSize.classList.add('disabled');
     rowLineWeight.classList.add('disabled');
     rowIntensity.classList.remove('disabled');
-  } else if (currentViz === 'mixed') {
-    // Both could be relevant or neither depending on mix, but let's disable for safety in "mixed"
+    rowNodeSpeed.classList.remove('disabled');
+    rowAnchorSpeed.classList.remove('disabled');
+  } else if (currentViz === 'bars' || currentViz === 'circle' || currentViz === 'circle-linear') {
+    rowDetail.classList.remove('disabled');
+    rowParticles.classList.add('disabled');
+    rowParticleSize.classList.add('disabled');
+    rowLineWeight.classList.add('disabled');
+    rowIntensity.classList.add('disabled');
+    rowNodeSpeed.classList.add('disabled');
+    rowAnchorSpeed.classList.add('disabled');
+  } else if (currentViz === 'flash') {
+    rowDetail.classList.add('disabled');
+    rowParticles.classList.add('disabled');
+    rowParticleSize.classList.add('disabled');
+    rowLineWeight.classList.add('disabled');
+    rowIntensity.classList.remove('disabled');
+    rowNodeSpeed.classList.add('disabled');
+    rowAnchorSpeed.classList.add('disabled');
+  } else {
+    // Mixed or unknown
     rowDetail.classList.add('disabled');
     rowParticles.classList.add('disabled');
     rowParticleSize.classList.add('disabled');
     rowLineWeight.classList.add('disabled');
     rowIntensity.classList.add('disabled');
-  } else {
-    rowDetail.classList.remove('disabled');
-    rowParticles.classList.add('disabled');
-    rowParticleSize.classList.add('disabled');
-    rowLineWeight.classList.add('disabled');
-    rowIntensity.classList.remove('disabled');
+    rowNodeSpeed.classList.add('disabled');
+    rowAnchorSpeed.classList.add('disabled');
   }
 
   // Update Detail UI
@@ -1706,20 +1735,20 @@ function updateSettingsVisibility() {
   // Update Particle Size UI
   const firstSize = selectedLayers[0].type === 'particles'
     ? (selectedLayers[0].vizSettings?.particles?.baseSize || 3)
-    : (selectedLayers[0].vizSettings?.proximityDots?.baseSize || 2);
+    : (selectedLayers[0].vizSettings?.constellation?.baseSize || 2);
 
   const allSameSize = selectedLayers.every(l => {
     const size = l.type === 'particles'
       ? (l.vizSettings?.particles?.baseSize || 3)
-      : (l.vizSettings?.proximityDots?.baseSize || 2);
+      : (l.vizSettings?.constellation?.baseSize || 2);
     return size === firstSize;
   });
   settingParticleSize.value = allSameSize ? firstSize : 2;
   settingParticleSizeInput.value = allSameSize ? firstSize : '-';
 
   // Update Line Weight UI
-  const firstWeight = selectedLayers[0].vizSettings?.proximityDots?.lineWeight || 1;
-  const allSameWeight = selectedLayers.every(l => (l.vizSettings?.proximityDots?.lineWeight || 1) === firstWeight);
+  const firstWeight = selectedLayers[0].vizSettings?.constellation?.lineWeight || 1;
+  const allSameWeight = selectedLayers.every(l => (l.vizSettings?.constellation?.lineWeight || 1) === firstWeight);
   settingLineWeight.value = allSameWeight ? firstWeight : 1;
   settingLineWeightInput.value = allSameWeight ? firstWeight : '-';
 
@@ -1728,6 +1757,20 @@ function updateSettingsVisibility() {
   const allSameIntensity = selectedLayers.every(l => (l.vizSettings?.[l.type]?.intensity || 1) === firstIntensity);
   settingIntensity.value = allSameIntensity ? firstIntensity : 1;
   settingIntensityInput.value = allSameIntensity ? firstIntensity : '-';
+
+  // Update Node Speed UI
+  let firstNodeSpeed = 1;
+  if (selectedLayers[0].type === 'particles') firstNodeSpeed = selectedLayers[0].vizSettings?.particles?.nodeSpeed || 1;
+  else if (selectedLayers[0].type === 'constellation') firstNodeSpeed = selectedLayers[0].vizSettings?.constellation?.nodeSpeed || 1;
+  else if (selectedLayers[0].type === 'crystalWall') firstNodeSpeed = selectedLayers[0].vizSettings?.crystalWall?.nodeSpeed || 2;
+
+  settingNodeSpeed.value = firstNodeSpeed;
+  settingNodeSpeedInput.value = firstNodeSpeed;
+
+  // Update Anchor Speed UI
+  const firstAnchorSpeed = selectedLayers[0].vizSettings?.crystalWall?.anchorSpeed || 2;
+  settingAnchorSpeed.value = firstAnchorSpeed;
+  settingAnchorSpeedInput.value = firstAnchorSpeed;
 }
 
 btnSettings.addEventListener('click', () => {
@@ -1783,16 +1826,16 @@ settingParticlesInput.addEventListener('input', (e) => {
 
 function updateParticleSizeSafe(val) {
   if (isNaN(val) || val < 0.1) return;
-  const targetLayers = layers.filter(l => l.selected && (l.type === 'particles' || l.type === 'proximityDots'));
+  const targetLayers = layers.filter(l => l.selected && (l.type === 'particles' || l.type === 'constellation'));
 
   if (targetLayers.length === 0) {
     // Apply to all if none selected? Consistent with previous logic
     layers.filter(l => l.type === 'particles').forEach(layer => setParticleSize(val, layer));
-    layers.filter(l => l.type === 'proximityDots').forEach(layer => setNodeSize(val, layer));
+    layers.filter(l => l.type === 'constellation').forEach(layer => setConstellationNodeSize(val, layer));
   } else {
     targetLayers.forEach(layer => {
       if (layer.type === 'particles') setParticleSize(val, layer);
-      if (layer.type === 'proximityDots') setNodeSize(val, layer);
+      if (layer.type === 'constellation') setConstellationNodeSize(val, layer);
     });
   }
 }
@@ -1813,11 +1856,11 @@ settingParticleSizeInput.addEventListener('input', (e) => {
 
 function updateLineWeightSafe(val) {
   if (isNaN(val) || val < 0.1) return;
-  const proximityLayers = layers.filter(l => l.selected && l.type === 'proximityDots');
-  if (proximityLayers.length === 0) {
-    layers.filter(l => l.type === 'proximityDots').forEach(layer => setLineWeight(val, layer));
+  const constellationLayers = layers.filter(l => l.selected && l.type === 'constellation');
+  if (constellationLayers.length === 0) {
+    layers.filter(l => l.type === 'constellation').forEach(layer => setConstellationLineWeight(val, layer));
   } else {
-    proximityLayers.forEach(layer => setLineWeight(val, layer));
+    constellationLayers.forEach(layer => setConstellationLineWeight(val, layer));
   }
 }
 
@@ -1863,6 +1906,64 @@ settingIntensityInput.addEventListener('input', (e) => {
   if (!isNaN(val) && val > 0) {
     settingIntensity.value = val;
     updateIntensitySafe(val);
+  }
+});
+
+function updateNodeSpeedSafe(val) {
+  if (isNaN(val) || val < 0.1) return;
+  const targetLayers = layers.filter(l => l.selected && (l.type === 'particles' || l.type === 'constellation' || l.type === 'crystalWall'));
+
+  if (targetLayers.length === 0) {
+    // Apply to all of relevant type if none selected (legacy behavior support?)
+    // Actually better to only apply to selected as per plan
+    layers.filter(l => l.type === 'particles').forEach(l => setParticleNodeSpeed(val, l));
+    layers.filter(l => l.type === 'constellation').forEach(l => setConstellationNodeSpeed(val, l));
+    layers.filter(l => l.type === 'crystalWall').forEach(l => setCrystalNodeSpeed(val, l));
+  } else {
+    targetLayers.forEach(layer => {
+      if (layer.type === 'particles') setParticleNodeSpeed(val, layer);
+      if (layer.type === 'constellation') setConstellationNodeSpeed(val, layer);
+      if (layer.type === 'crystalWall') setCrystalNodeSpeed(val, layer);
+    });
+  }
+}
+
+settingNodeSpeed.addEventListener('input', (e) => {
+  const val = parseFloat(e.target.value);
+  settingNodeSpeedInput.value = val;
+  updateNodeSpeedSafe(val);
+});
+
+settingNodeSpeedInput.addEventListener('input', (e) => {
+  const val = parseFloat(e.target.value);
+  if (!isNaN(val) && val > 0) {
+    settingNodeSpeed.value = val;
+    updateNodeSpeedSafe(val);
+  }
+});
+
+function updateAnchorSpeedSafe(val) {
+  if (isNaN(val) || val < 0.1) return;
+  const targetLayers = layers.filter(l => l.selected && l.type === 'crystalWall');
+
+  if (targetLayers.length === 0) {
+    layers.filter(l => l.type === 'crystalWall').forEach(l => setAnchorSpeed(val, l));
+  } else {
+    targetLayers.forEach(l => setAnchorSpeed(val, l));
+  }
+}
+
+settingAnchorSpeed.addEventListener('input', (e) => {
+  const val = parseFloat(e.target.value);
+  settingAnchorSpeedInput.value = val;
+  updateAnchorSpeedSafe(val);
+});
+
+settingAnchorSpeedInput.addEventListener('input', (e) => {
+  const val = parseFloat(e.target.value);
+  if (!isNaN(val) && val > 0) {
+    settingAnchorSpeed.value = val;
+    updateAnchorSpeedSafe(val);
   }
 });
 

@@ -130,3 +130,21 @@ export function getMultiGradientColor(multiGradients, t) {
 
     return `rgb(${Math.floor(totalR / totalInf)}, ${Math.floor(totalG / totalInf)}, ${Math.floor(totalB / totalInf)})`;
 }
+
+/**
+ * Convert any supported color format to RGBA string
+ * @param {string} color - Hex or RGB string
+ * @param {number} alpha - Alpha value (0-1)
+ * @returns {string} RGBA string
+ */
+export function colorToRgba(color, alpha) {
+    if (!color) return `rgba(255,255,255,${alpha})`;
+    if (color.startsWith('#')) {
+        const c = hexToRgb(color);
+        return `rgba(${c.r},${c.g},${c.b},${alpha})`;
+    }
+    if (color.startsWith('rgb(')) {
+        return color.replace('rgb(', 'rgba(').replace(')', `, ${alpha})`);
+    }
+    return color;
+}

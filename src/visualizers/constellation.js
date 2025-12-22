@@ -1,4 +1,4 @@
-import { hexToRgb, getMultiGradientColor } from '../utils/colorUtils.js';
+import { hexToRgb, colorToRgba, getMultiGradientColor, getColorFromStops } from '../utils/colorUtils.js';
 
 // Default settings
 const DEFAULTS = {
@@ -8,22 +8,23 @@ const DEFAULTS = {
     pulseStrength: 0.8,
     baseSize: 2,
     lineWeight: 1,
-    intensity: 1.0
+    intensity: 1.0,
+    nodeSpeed: 1.0
 };
 
 /**
- * Proximity Dots Visualizer
+ * Constellation Visualizer
  * Dots move around and connect with lines when close.
  * Reactive to audio energy (frequency data).
  */
-export function drawProximityDots(ctx, canvas, dataArray, bufferLength, vizColors, layer) {
+export function drawConstellation(ctx, canvas, dataArray, bufferLength, vizColors, layer) {
     if (!layer) return;
 
     const width = canvas.width || 800;
     const height = canvas.height || 600;
 
     // Get settings from layer or use defaults
-    const settings = layer.vizSettings?.proximityDots || DEFAULTS;
+    const settings = layer.vizSettings?.constellation || DEFAULTS;
     const NODE_COUNT = settings.nodeCount || DEFAULTS.nodeCount;
     const CONNECT_DIST = settings.connectDist || DEFAULTS.connectDist;
     const SPEED = settings.speed || DEFAULTS.speed;
@@ -31,6 +32,7 @@ export function drawProximityDots(ctx, canvas, dataArray, bufferLength, vizColor
     const BASE_SIZE = settings.baseSize || DEFAULTS.baseSize;
     const LINE_WEIGHT = settings.lineWeight || DEFAULTS.lineWeight;
     const INTENSITY = settings.intensity || DEFAULTS.intensity;
+    const NODE_SPEED = settings.nodeSpeed || DEFAULTS.nodeSpeed;
 
     // Init State
     if (!layer.vizState || !layer.vizState.nodes ||
@@ -81,8 +83,8 @@ export function drawProximityDots(ctx, canvas, dataArray, bufferLength, vizColor
 
     // Update Nodes
     nodes.forEach(node => {
-        node.x += node.vx * pulseFactor;
-        node.y += node.vy * pulseFactor;
+        node.x += node.vx * pulseFactor * NODE_SPEED;
+        node.y += node.vy * pulseFactor * NODE_SPEED;
 
         if (isNaN(node.x) || isNaN(node.y)) needsReset = true;
 
@@ -108,58 +110,10 @@ export function drawProximityDots(ctx, canvas, dataArray, bufferLength, vizColor
 
     // Predetermine RGBs for stops for efficiency. 
     // FALLBACK if vizColors.stops is missing or empty
-    const stops = vizColors.stops && vizColors.stops.length > 0 ? vizColors.stops : [{ color: '#ffffff' }];
-    const stopRGBs = stops.map(s => hexToRgb(s.color));
-
-    // Helper to get color from stops based on a normalized value (t)
-    const getColorFromStops = (stops, t) => {
-        if (stops.length === 0) return '#ffffff';
-        if (stops.length === 1) return stops[0].color;
-
-        // Ensure t is within [0, 1]
-        t = Math.max(0, Math.min(1, t));
-
-        // Find the two stops to interpolate between
-        let idx1 = 0;
-        let idx2 = stops.length - 1;
-
-        for (let i = 0; i < stops.length - 1; i++) {
-            if (t >= stops[i].position && t <= stops[i + 1].position) {
-                idx1 = i;
-                idx2 = i + 1;
-                break;
-            } else if (t < stops[0].position) { // Before first stop
-                idx1 = 0;
-                idx2 = 0;
-                break;
-            } else if (t > stops[stops.length - 1].position) { // After last stop
-                idx1 = stops.length - 1;
-                idx2 = stops.length - 1;
-                break;
-            }
-        }
-
-        const stop1 = stops[idx1];
-        const stop2 = stops[idx2];
-
-        if (idx1 === idx2) { // t is outside the range or only one stop
-            return stop1.color;
-        }
-
-        // Interpolate colors
-        const localT = (t - stop1.position) / (stop2.position - stop1.position);
-        const rgb1 = hexToRgb(stop1.color);
-        const rgb2 = hexToRgb(stop2.color);
-
-        const r = Math.round(rgb1.r + (rgb2.r - rgb1.r) * localT);
-        const g = Math.round(rgb1.g + (rgb2.g - rgb1.g) * localT);
-        const b = Math.round(rgb1.b + (rgb2.b - rgb1.b) * localT);
-
-        return `rgb(${r}, ${g}, ${b})`;
-    };
-
-    // Sort stops by position for correct gradient interpolation
-    const sortedStops = [...stops].sort((a, b) => (a.position || 0) - (b.position || 0));
+    // Use pre-sorted stops if available
+    const stops = vizColors.stops && vizColors.stops.length > 0 ? vizColors.stops : [{ color: '#ffffff', offset: 0 }];
+    const sortedStops = vizColors.sortedStops ||
+        [...stops].sort((a, b) => a.offset - b.offset);
 
 
     nodes.forEach((nodeA, i) => {
@@ -169,25 +123,13 @@ export function drawProximityDots(ctx, canvas, dataArray, bufferLength, vizColor
         const useFreqSource = (vizColors.source !== 'volume');
 
         if (vizColors.mode === 'single') {
-            const rgbA = stopRGBs[0] || { r: 255, g: 255, b: 255 };
-            colorA = `rgb(${rgbA.r}, ${rgbA.g}, ${rgbA.b})`;
+            colorA = sortedStops[0]?.color || '#ffffff';
         } else if (vizColors.mode === 'multi-gradient' && vizColors.multiGradients) {
             const t = useFreqSource ? (i / nodes.length) : (valA / 200);
             colorA = getMultiGradientColor(vizColors.multiGradients, t);
         } else { // Default to gradient mode
             const t = useFreqSource ? (i / nodes.length) : (valA / 200);
             colorA = getColorFromStops(sortedStops, t);
-        }
-
-        // Parse colorA to get RGB components for strokeStyle if it's an rgb() string
-        let rgbA_components = { r: 255, g: 255, b: 255 };
-        if (colorA.startsWith('rgb(')) {
-            const parts = colorA.match(/\d+/g).map(Number);
-            if (parts.length >= 3) {
-                rgbA_components = { r: parts[0], g: parts[1], b: parts[2] };
-            }
-        } else { // Assume it's a hex string
-            rgbA_components = hexToRgb(colorA);
         }
 
         // Draw Node
@@ -214,7 +156,7 @@ export function drawProximityDots(ctx, canvas, dataArray, bufferLength, vizColor
                 ctx.lineTo(nodeB.x, nodeB.y);
 
                 // Use colorA with alpha
-                ctx.strokeStyle = `rgba(${rgbA_components.r}, ${rgbA_components.g}, ${rgbA_components.b}, ${alpha})`;
+                ctx.strokeStyle = colorToRgba(colorA, alpha);
                 ctx.stroke();
             }
         }
@@ -224,14 +166,14 @@ export function drawProximityDots(ctx, canvas, dataArray, bufferLength, vizColor
 /**
  * Get default settings for proximity dots visualizer
  */
-export function getProximityDotsDefaults() {
+export function getConstellationDefaults() {
     return { ...DEFAULTS };
 }
 
 /**
  * Rescale nodes for resize
  */
-export function scaleProximityNodes(oldW, oldH, newW, newH, layer) {
+export function scaleConstellationNodes(oldW, oldH, newW, newH, layer) {
     if (!layer.vizState?.nodes) return;
     const scaleX = newW / oldW;
     const scaleY = newH / oldH;
@@ -243,29 +185,36 @@ export function scaleProximityNodes(oldW, oldH, newW, newH, layer) {
 /**
  * Set node size for a specific layer
  */
-export function setNodeSize(size, layer) {
+export function setConstellationNodeSize(size, layer) {
     if (!layer) return;
     if (!layer.vizSettings) layer.vizSettings = {};
-    if (!layer.vizSettings.proximityDots) layer.vizSettings.proximityDots = { ...DEFAULTS };
-    layer.vizSettings.proximityDots.baseSize = size;
+    if (!layer.vizSettings.constellation) layer.vizSettings.constellation = { ...DEFAULTS };
+    layer.vizSettings.constellation.baseSize = size;
 }
 
 /**
  * Set line weight for a specific layer
  */
-export function setLineWeight(weight, layer) {
+export function setConstellationLineWeight(weight, layer) {
     if (!layer) return;
     if (!layer.vizSettings) layer.vizSettings = {};
-    if (!layer.vizSettings.proximityDots) layer.vizSettings.proximityDots = { ...DEFAULTS };
-    layer.vizSettings.proximityDots.lineWeight = weight;
+    if (!layer.vizSettings.constellation) layer.vizSettings.constellation = { ...DEFAULTS };
+    layer.vizSettings.constellation.lineWeight = weight;
 }
 
 /**
  * Set intensity for a specific layer
  */
-export function setIntensity(val, layer) {
+export function setConstellationIntensity(val, layer) {
     if (!layer) return;
     if (!layer.vizSettings) layer.vizSettings = {};
-    if (!layer.vizSettings.proximityDots) layer.vizSettings.proximityDots = { ...DEFAULTS };
-    layer.vizSettings.proximityDots.intensity = val;
+    if (!layer.vizSettings.constellation) layer.vizSettings.constellation = { ...DEFAULTS };
+    layer.vizSettings.constellation.intensity = val;
+}
+
+export function setConstellationNodeSpeed(val, layer) {
+    if (!layer) return;
+    if (!layer.vizSettings) layer.vizSettings = {};
+    if (!layer.vizSettings.constellation) layer.vizSettings.constellation = { ...DEFAULTS };
+    layer.vizSettings.constellation.nodeSpeed = val;
 }
