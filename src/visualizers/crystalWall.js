@@ -40,11 +40,17 @@ export function drawCrystalWall(ctx, canvas, dataArray, bufferLength, vizColors,
             type: 'infinite-grid',
             driftX: 0,
             driftY: 0,
-            angleY: (Math.random() - 0.5) * 0.05, // Movement direction
-            angleX: (Math.random() - 0.5) * 0.05,
             totalTime: 0,
-            vx: (Math.random() - 0.5) * 0.5,
-            vy: (Math.random() - 0.5) * 0.5
+
+            // Velocity state
+            currentVx: (Math.random() - 0.5) * 0.5,
+            currentVy: (Math.random() - 0.5) * 0.5,
+            targetVx: (Math.random() - 0.5) * 0.5,
+            targetVy: (Math.random() - 0.5) * 0.5,
+
+            // Timing
+            changeTimer: 0,
+            changeDuration: 100 + Math.random() * 200
         };
     }
 
@@ -58,10 +64,29 @@ export function drawCrystalWall(ctx, canvas, dataArray, bufferLength, vizColors,
     const energy = Math.pow(rawEnergy, 0.7) * INTENSITY;
     const pulseFactor = 1 + energy * PULSE;
 
+    // Update Velocity Targets
+    state.changeTimer += 1 * ANCHOR_SPEED; // Timer moves faster if speed is higher
+    if (state.changeTimer > state.changeDuration) {
+        state.changeTimer = 0;
+        // Faster speed means shorter duration between changes
+        // Base duration 200-500 frames at speed 1.0
+        state.changeDuration = (10000 + Math.random() * 10000) / (ANCHOR_SPEED || 0.1);
+
+        // Pick new random target velocity
+        state.targetVx = (Math.random() - 0.5) * 0.5;
+        state.targetVy = (Math.random() - 0.5) * 0.5;
+    }
+
+    // Interpolate Current Velocity towards Target
+    // The easing factor should also be somewhat proportional to speed to avoid lag at high speeds
+    const ease = 0.0001 * (ANCHOR_SPEED || 1);
+    state.currentVx += (state.targetVx - state.currentVx) * ease;
+    state.currentVy += (state.targetVy - state.currentVy) * ease;
+
     // Update state
     state.totalTime += 0.016 * NODE_SPEED; // Use Node Speed for rotation/jitter timing
-    state.driftX += state.vx * ANCHOR_SPEED; // Use Anchor Speed for drift
-    state.driftY += state.vy * ANCHOR_SPEED;
+    state.driftX += state.currentVx * ANCHOR_SPEED; // Use Current Velocity & Anchor Speed for drift
+    state.driftY += state.currentVy * ANCHOR_SPEED;
 
     const margin = spacing * 1.5;
     const startCol = Math.floor((-state.driftX - margin) / cellW);
