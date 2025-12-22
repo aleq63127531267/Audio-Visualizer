@@ -338,13 +338,52 @@ button:hover {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  cursor: pointer;
-  /* Clickable */
+  cursor: default;
+  /* Change from pointer to default to emphasize handle for dragging */
   transition: border-color 0.2s, background 0.2s;
+  position: relative;
 }
 
 .layer-item:hover {
   background: #252525;
+}
+
+.drag-handle {
+  position: absolute;
+  left: 2px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 20px;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  color: #444;
+  /* Darker as requested */
+  font-size: 1.2rem;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px 0 0 4px;
+  transition: color 0.2s, background 0.2s;
+}
+
+.drag-handle:hover {
+  color: #00ffff;
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+.layer-item.dragging {
+  opacity: 0.5;
+  background: #333;
+  border: 1px dashed #00ffff;
+}
+
+.layer-item.drop-over {
+  border-top: 2px solid #00ffff;
 }
 
 #layers-list {

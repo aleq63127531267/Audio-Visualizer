@@ -221,12 +221,17 @@ function renderLayersList() {
   displayLayers.forEach(({ layer, index }) => {
     const item = document.createElement('div');
     item.className = 'layer-item';
-    item.draggable = true; // Enable dragging
+    item.draggable = false; // Disable by default, enable only on handle mousedown
 
     // Drag Handle
     const dragHandle = document.createElement('div');
     dragHandle.className = 'drag-handle';
     dragHandle.textContent = '⠿';
+
+    dragHandle.onmousedown = () => {
+      item.draggable = true;
+    };
+
     item.appendChild(dragHandle);
 
     // Classes
@@ -296,6 +301,7 @@ function renderLayersList() {
     });
 
     item.addEventListener('dragend', () => {
+      item.draggable = false; // Re-disable
       item.classList.remove('dragging');
       // Remove all drop-over classes just in case
       document.querySelectorAll('.layer-item').forEach(el => el.classList.remove('drop-over'));
@@ -1425,6 +1431,102 @@ function renderColorEditor() {
 
   btnAddStop.style.display = (targetColors.mode === 'single') ? 'none' : 'block';
   updatePreview();
+}
+
+function renderMultiGradientEditor(targetColors) {
+  if (!targetColors.multiGradients) {
+    targetColors.multiGradients = [
+      { start: 0, end: 50, stops: [{ offset: 0, color: '#ff0000' }, { offset: 100, color: '#0000ff' }] },
+      { start: 50, end: 100, stops: [{ offset: 0, color: '#00ff00' }, { offset: 100, color: '#ffff00' }] }
+    ];
+  }
+
+  targetColors.multiGradients.forEach((grad, index) => {
+    const group = document.createElement('div');
+    group.className = 'gradient-group';
+    group.style.border = '1px solid rgba(255,255,255,0.1)';
+    group.style.padding = '10px';
+    group.style.marginBottom = '10px';
+    group.style.borderRadius = '5px';
+
+    const header = document.createElement('div');
+    header.style.display = 'flex';
+    header.style.justifyContent = 'space-between';
+    header.style.marginBottom = '5px';
+    header.innerHTML = `<strong>Gradient ${index + 1}</strong>`;
+
+    const btnRemove = document.createElement('button');
+    btnRemove.className = 'btn-remove-stop';
+    btnRemove.textContent = '×';
+    btnRemove.onclick = () => {
+      targetColors.multiGradients.splice(index, 1);
+      renderColorEditor();
+      updatePreview();
+    };
+    header.appendChild(btnRemove);
+    group.appendChild(header);
+
+    // Range controls
+    const rangeRow = document.createElement('div');
+    rangeRow.className = 'color-row';
+    rangeRow.innerHTML = `<label>Range</label>`;
+
+    const startInp = document.createElement('input');
+    startInp.type = 'range'; startInp.min = 0; startInp.max = 100;
+    startInp.value = grad.start;
+    startInp.oninput = (e) => { grad.start = parseInt(e.target.value); updatePreview(); };
+
+    const endInp = document.createElement('input');
+    endInp.type = 'range'; endInp.min = 0; endInp.max = 100;
+    endInp.value = grad.end;
+    endInp.oninput = (e) => { grad.end = parseInt(e.target.value); updatePreview(); };
+
+    rangeRow.appendChild(startInp);
+    rangeRow.appendChild(endInp);
+    group.appendChild(rangeRow);
+
+    // Stops sub-list
+    const stopsList = document.createElement('div');
+    grad.stops.forEach((stop, sIndex) => {
+      const sRow = document.createElement('div');
+      sRow.className = 'color-stop-row';
+
+      const cInp = document.createElement('input');
+      cInp.type = 'color'; cInp.value = stop.color;
+      cInp.oninput = (e) => { stop.color = e.target.value; updatePreview(); };
+
+      const oInp = document.createElement('input');
+      oInp.type = 'range'; oInp.min = 0; oInp.max = 100;
+      oInp.value = stop.offset;
+      oInp.oninput = (e) => { stop.offset = parseInt(e.target.value); updatePreview(); };
+
+      sRow.appendChild(cInp);
+      sRow.appendChild(oInp);
+      stopsList.appendChild(sRow);
+    });
+
+    const btnAddS = document.createElement('button');
+    btnAddS.className = 'small-btn';
+    btnAddS.textContent = '+ Color';
+    btnAddS.onclick = () => {
+      grad.stops.push({ offset: 50, color: '#ffffff' });
+      renderColorEditor();
+    };
+
+    group.appendChild(stopsList);
+    group.appendChild(btnAddS);
+    colorStopsContainer.appendChild(group);
+  });
+
+  const btnAddG = document.createElement('button');
+  btnAddG.className = 'small-btn';
+  btnAddG.textContent = '+ Add Gradient Block';
+  btnAddG.style.width = '100%';
+  btnAddG.onclick = () => {
+    targetColors.multiGradients.push({ start: 80, end: 100, stops: [{ offset: 0, color: '#ffffff' }, { offset: 100, color: '#ffffff' }] });
+    renderColorEditor();
+  };
+  colorStopsContainer.appendChild(btnAddG);
 }
 
 function updatePreview() {
