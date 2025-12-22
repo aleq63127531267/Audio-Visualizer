@@ -38,23 +38,15 @@ class Particle {
         this.currentSize = this.baseSize + (value / 255) * 10 * intensity;
 
         // Color Calculation
+        const useFreqSource = (vizColors.source !== 'volume');
+
         if (vizColors.mode === 'single') {
             this.color = sortedStops[0] ? hexToRgbString(sortedStops[0].color) : '#fff';
         } else if (vizColors.mode === 'multi-gradient' && vizColors.multiGradients) {
-            let t = 0;
-            if (vizColors.mode === 'gradient-freq') { // This shouldn't happen in multi-gradient mode usually, but safety first
-                t = this.index / particleCount;
-            } else {
-                t = this.index / particleCount; // For particles, we usually map index to spectrum
-            }
+            const t = useFreqSource ? (this.index / particleCount) : (value / 200);
             this.color = getMultiGradientColor(vizColors.multiGradients, t);
         } else {
-            let t = 0;
-            if (vizColors.mode === 'gradient-freq') {
-                t = this.index / particleCount;
-            } else {
-                t = Math.min(1, value / 200);
-            }
+            const t = useFreqSource ? (this.index / particleCount) : (value / 200);
             this.color = getColorFromStops(sortedStops, t);
         }
     }

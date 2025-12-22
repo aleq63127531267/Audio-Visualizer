@@ -70,17 +70,36 @@ export function drawCrystalWall(ctx, canvas, dataArray, bufferLength, vizColors,
     const stopRGBs = stops.map(s => hexToRgb(s.color));
 
     // For Crystal Wall, we find triangles (triplets of connected nodes)
-    // and fill them.
+    // and fill them. We also ensure every node has at least one connection if possible.
     for (let i = 0; i < nodes.length; i++) {
-        for (let j = i + 1; j < nodes.length; j++) {
-            if (distSq(nodes[i], nodes[j]) < CONNECT_DIST * CONNECT_DIST) {
-                for (let k = j + 1; k < nodes.length; k++) {
-                    if (distSq(nodes[j], nodes[k]) < CONNECT_DIST * CONNECT_DIST &&
-                        distSq(nodes[i], nodes[k]) < CONNECT_DIST * CONNECT_DIST) {
+        let neighbors = [];
+        for (let j = 0; j < nodes.length; j++) {
+            if (i === j) continue;
+            const dSq = distSq(nodes[i], nodes[j]);
+            if (dSq < CONNECT_DIST * CONNECT_DIST) {
+                neighbors.push(j);
+            }
+        }
 
-                        // We found a triangle!
-                        fillTriangle(ctx, nodes[i], nodes[j], nodes[k], energy, stopRGBs, vizColors);
-                    }
+        // Fallback: If no neighbors in range, find the 2 nearest
+        if (neighbors.length === 0) {
+            const sortedByDist = nodes
+                .map((n, idx) => ({ idx, dist: i === idx ? Infinity : distSq(nodes[i], n) }))
+                .sort((a, b) => a.dist - b.dist);
+            neighbors.push(sortedByDist[0].idx);
+            neighbors.push(sortedByDist[1].idx);
+        }
+
+        // Triangle detection among neighbors
+        for (let idxJ = 0; idxJ < neighbors.length; idxJ++) {
+            const j = neighbors[idxJ];
+            if (j <= i) continue; // Avoid double counting pairs
+
+            for (let idxK = idxJ + 1; idxK < neighbors.length; idxK++) {
+                const k = neighbors[idxK];
+                // Check if j and k are also connected (to form a triangle with i)
+                if (distSq(nodes[j], nodes[k]) < (CONNECT_DIST * CONNECT_DIST * 2)) { // Slightly more lenient for the "third leg" if forced
+                    fillTriangle(ctx, nodes[i], nodes[j], nodes[k], energy, stopRGBs, vizColors);
                 }
             }
         }
@@ -100,18 +119,26 @@ function fillTriangle(ctx, n1, n2, n3, energy, stopRGBs, vizColors) {
     // Pick color
     let colorString;
     const alpha = (0.05 + energy * 0.3);
+    const useFreqSource = (vizColors.source !== 'volume');
+    const sortedStops = vizColors.sortedStops ||
+        [...vizColors.stops].sort((a, b) => a.offset - b.offset);
 
     if (vizColors.mode === 'multi-gradient' && vizColors.multiGradients) {
-        colorString = getMultiGradientColor(vizColors.multiGradients, centerX / ctx.canvas.width);
-        // getMultiGradientColor returns rgb(...), convert to rgba
+        const t = useFreqSource ? (centerX / ctx.canvas.width) : energy;
+        colorString = getMultiGradientColor(vizColors.multiGradients, t);
         ctx.fillStyle = colorString.replace('rgb(', 'rgba(').replace(')', `, ${alpha})`);
         ctx.strokeStyle = colorString.replace('rgb(', 'rgba(').replace(')', `, ${alpha * 0.5})`);
-    } else {
-        const rgb = stopRGBs[Math.floor(centerX / 100) % stopRGBs.length] || { r: 255, g: 255, b: 255 };
+    } else if (vizColors.mode === 'single') {
+        const rgb = stopRGBs[0] || { r: 255, g: 255, b: 255 };
         colorString = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha})`;
         ctx.fillStyle = colorString;
-        // For stroke, adjust alpha of the existing rgba string
         ctx.strokeStyle = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha * 0.5})`;
+    } else {
+        // Gradient mode
+        const t = useFreqSource ? (centerX / ctx.canvas.width) : energy;
+        colorString = getColorFromStops(sortedStops, t);
+        ctx.fillStyle = colorString.replace('rgb(', 'rgba(').replace(')', `, ${alpha})`);
+        ctx.strokeStyle = colorString.replace('rgb(', 'rgba(').replace(')', `, ${alpha * 0.5})`);
     }
 
     ctx.beginPath();

@@ -1,3 +1,5 @@
+import { getColorFromStops, getMultiGradientColor } from '../utils/colorUtils.js';
+
 // Default settings
 const DEFAULTS = {
     barWidthMultiplier: 2.5
@@ -32,10 +34,11 @@ export function drawBars(ctx, canvas, dataArray, bufferLength, vizColors, layer)
         [...vizColors.stops].sort((a, b) => a.offset - b.offset);
 
     let fillStyle;
+    const useFreqSource = (vizColors.source !== 'volume');
 
     if (vizColors.mode === 'single') {
         fillStyle = sortedStops[0]?.color || '#fff';
-    } else if (vizColors.mode === 'gradient-freq') {
+    } else if (vizColors.mode === 'gradient' && useFreqSource) {
         // Check gradient cache
         const gradientKey = getGradientKey(vizColors.mode, sortedStops, width, height);
         if (cachedGradientKey === gradientKey && cachedGradient) {
@@ -49,7 +52,7 @@ export function drawBars(ctx, canvas, dataArray, bufferLength, vizColors, layer)
             cachedGradient = gradient;
             cachedGradientKey = gradientKey;
         }
-    } else if (vizColors.mode === 'multi-gradient' && vizColors.multiGradients) {
+    } else if (vizColors.mode === 'multi-gradient' && useFreqSource && vizColors.multiGradients) {
         const gradientKey = getGradientKey(vizColors.mode, vizColors.multiGradients, width, height);
         if (cachedGradientKey === gradientKey && cachedGradient) {
             fillStyle = cachedGradient;
@@ -67,10 +70,20 @@ export function drawBars(ctx, canvas, dataArray, bufferLength, vizColors, layer)
         }
     }
 
-    ctx.fillStyle = fillStyle;
+    if (fillStyle) ctx.fillStyle = fillStyle;
 
     for (let i = 0; i < bufferLength; i++) {
         barHeight = dataArray[i] * INTENSITY;
+
+        if (!useFreqSource) {
+            const t = dataArray[i] / 255;
+            if (vizColors.mode === 'multi-gradient') {
+                ctx.fillStyle = getMultiGradientColor(vizColors.multiGradients, t);
+            } else {
+                ctx.fillStyle = getColorFromStops(sortedStops, t);
+            }
+        }
+
         ctx.fillRect(x, height - barHeight * 1.5, barWidth, barHeight * 1.5);
         x += barWidth + 1;
     }

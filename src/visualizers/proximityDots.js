@@ -111,13 +111,83 @@ export function drawProximityDots(ctx, canvas, dataArray, bufferLength, vizColor
     const stops = vizColors.stops && vizColors.stops.length > 0 ? vizColors.stops : [{ color: '#ffffff' }];
     const stopRGBs = stops.map(s => hexToRgb(s.color));
 
+    // Helper to get color from stops based on a normalized value (t)
+    const getColorFromStops = (stops, t) => {
+        if (stops.length === 0) return '#ffffff';
+        if (stops.length === 1) return stops[0].color;
+
+        // Ensure t is within [0, 1]
+        t = Math.max(0, Math.min(1, t));
+
+        // Find the two stops to interpolate between
+        let idx1 = 0;
+        let idx2 = stops.length - 1;
+
+        for (let i = 0; i < stops.length - 1; i++) {
+            if (t >= stops[i].position && t <= stops[i + 1].position) {
+                idx1 = i;
+                idx2 = i + 1;
+                break;
+            } else if (t < stops[0].position) { // Before first stop
+                idx1 = 0;
+                idx2 = 0;
+                break;
+            } else if (t > stops[stops.length - 1].position) { // After last stop
+                idx1 = stops.length - 1;
+                idx2 = stops.length - 1;
+                break;
+            }
+        }
+
+        const stop1 = stops[idx1];
+        const stop2 = stops[idx2];
+
+        if (idx1 === idx2) { // t is outside the range or only one stop
+            return stop1.color;
+        }
+
+        // Interpolate colors
+        const localT = (t - stop1.position) / (stop2.position - stop1.position);
+        const rgb1 = hexToRgb(stop1.color);
+        const rgb2 = hexToRgb(stop2.color);
+
+        const r = Math.round(rgb1.r + (rgb2.r - rgb1.r) * localT);
+        const g = Math.round(rgb1.g + (rgb2.g - rgb1.g) * localT);
+        const b = Math.round(rgb1.b + (rgb2.b - rgb1.b) * localT);
+
+        return `rgb(${r}, ${g}, ${b})`;
+    };
+
+    // Sort stops by position for correct gradient interpolation
+    const sortedStops = [...stops].sort((a, b) => (a.position || 0) - (b.position || 0));
+
+
     nodes.forEach((nodeA, i) => {
         let colorA;
-        if (vizColors.mode === 'multi-gradient' && vizColors.multiGradients) {
-            colorA = getMultiGradientColor(vizColors.multiGradients, i / nodes.length);
-        } else {
-            const rgbA = stopRGBs[nodeA.colorIndex % stopRGBs.length] || { r: 255, g: 255, b: 255 };
+        const binIndex = Math.floor((i / nodes.length) * (bufferLength * 0.5));
+        const valA = dataArray[binIndex] || 0;
+        const useFreqSource = (vizColors.source !== 'volume');
+
+        if (vizColors.mode === 'single') {
+            const rgbA = stopRGBs[0] || { r: 255, g: 255, b: 255 };
             colorA = `rgb(${rgbA.r}, ${rgbA.g}, ${rgbA.b})`;
+        } else if (vizColors.mode === 'multi-gradient' && vizColors.multiGradients) {
+            const t = useFreqSource ? (i / nodes.length) : (valA / 200);
+            colorA = getMultiGradientColor(vizColors.multiGradients, t);
+        } else { // Default to gradient mode
+            const t = useFreqSource ? (i / nodes.length) : (valA / 200);
+            colorA = getColorFromStops(sortedStops, t);
+        }
+
+        // Parse colorA to get RGB components for strokeStyle if it's an rgb() string
+        let rgbA_components = { r: 255, g: 255, b: 255 };
+        if (colorA.startsWith('rgb(')) {
+            const parts = colorA.match(/\d+/g).map(Number);
+            if (parts.length >= 3) {
+                rgbA_components = { r: parts[0], g: parts[1], b: parts[2] };
+            }
+        } else { // Assume it's a hex string
+            rgbA_components = hexToRgb(colorA);
         }
 
         // Draw Node
@@ -143,8 +213,8 @@ export function drawProximityDots(ctx, canvas, dataArray, bufferLength, vizColor
                 ctx.moveTo(nodeA.x, nodeA.y);
                 ctx.lineTo(nodeB.x, nodeB.y);
 
-                // Blend colors? Simple: use Node A's color with alpha
-                ctx.strokeStyle = `rgba(${rgbA.r}, ${rgbA.g}, ${rgbA.b}, ${alpha})`;
+                // Use colorA with alpha
+                ctx.strokeStyle = `rgba(${rgbA_components.r}, ${rgbA_components.g}, ${rgbA_components.b}, ${alpha})`;
                 ctx.stroke();
             }
         }

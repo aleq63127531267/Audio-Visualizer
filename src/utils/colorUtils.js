@@ -85,22 +85,48 @@ export function getColorFromStops(stops, t) {
 export function getMultiGradientColor(multiGradients, t) {
     const tPerc = t * 100;
 
-    // Find segments that cover this t
-    const activeSegments = multiGradients.filter(g => tPerc >= g.start && tPerc <= g.end);
+    // Find all segments that have some influence (within a small margin or overlapping)
+    const margin = 5; // 5% overlap/margin for smoothing
+    const influencers = multiGradients
+        .map(g => {
+            const mid = (g.start + g.end) / 2;
+            const halfLen = (g.end - g.start) / 2;
+            const dist = Math.abs(tPerc - mid);
+            // Influence is 1 inside the segment, and tapers off outside
+            let influence = 0;
+            if (tPerc >= g.start && tPerc <= g.end) {
+                influence = 1;
+            } else if (dist < halfLen + margin) {
+                influence = 1 - (dist - halfLen) / margin;
+            }
+            return { g, influence };
+        })
+        .filter(item => item.influence > 0);
 
-    if (activeSegments.length === 0) {
-        // Fallback to nearest or transparent? Let's use black or nearest.
-        return 'rgb(0,0,0)';
+    if (influencers.length === 0) return 'rgb(0,0,0)';
+    if (influencers.length === 1) {
+        const segment = influencers[0].g;
+        const range = segment.end - segment.start;
+        const localT = range === 0 ? 0 : (tPerc - segment.start) / range;
+        return getColorFromStops(segment.stops, localT);
     }
 
-    // If multiple overlap, we could blend or just take the first. 
-    // Let's blend them based on their influence at this point? 
-    // Simple version for now: Use the first one found.
-    const segment = activeSegments[0];
+    // Blend multiple segments
+    let totalR = 0, totalG = 0, totalB = 0, totalInf = 0;
+    influencers.forEach(item => {
+        const segment = item.g;
+        const range = segment.end - segment.start;
+        const localT = range === 0 ? 0 : (tPerc - segment.start) / range;
+        const color = getColorFromStops(segment.stops, localT);
+        // Extract RGB
+        const match = color.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+        if (match) {
+            totalR += parseInt(match[1]) * item.influence;
+            totalG += parseInt(match[2]) * item.influence;
+            totalB += parseInt(match[3]) * item.influence;
+            totalInf += item.influence;
+        }
+    });
 
-    // Normalize t within the segment
-    const range = segment.end - segment.start;
-    const localT = range === 0 ? 0 : (tPerc - segment.start) / range;
-
-    return getColorFromStops(segment.stops, localT);
+    return `rgb(${Math.floor(totalR / totalInf)}, ${Math.floor(totalG / totalInf)}, ${Math.floor(totalB / totalInf)})`;
 }

@@ -99,7 +99,8 @@ let layers = [
     fftSize: 2048,
     // Per-layer color settings
     colors: {
-      mode: 'gradient-freq',
+      mode: 'gradient',
+      source: 'frequency',
       stops: [
         { offset: 0, color: '#00ffff' },
         { offset: 100, color: '#ff00ff' }
@@ -690,6 +691,8 @@ const exitHint = document.getElementById('exit-hint'); // Should be there from H
 
 // New Color DOM
 const colorModeSelect = document.getElementById('color-mode');
+const colorSourceSelect = document.getElementById('color-source');
+const rowColorSource = document.getElementById('row-color-source');
 const colorStopsContainer = document.getElementById('color-stops-container');
 const btnAddStop = document.getElementById('btn-add-stop');
 const previewCanvas = document.getElementById('gradient-preview');
@@ -698,7 +701,8 @@ const previewCtx = previewCanvas.getContext('2d');
 
 // Color State with pre-sorted stops for performance
 let vizColors = {
-  mode: 'gradient-freq',
+  mode: 'gradient',
+  source: 'frequency',
   stops: [
     { offset: 0, color: '#ff0000' },
     { offset: 100, color: '#ffff00' }
@@ -1374,6 +1378,10 @@ function renderColorEditor() {
   const targetColors = getActiveColors();
   colorStopsContainer.innerHTML = '';
   colorModeSelect.value = targetColors.mode;
+  colorSourceSelect.value = targetColors.source || 'frequency';
+
+  // Toggle source visibility: only for non-single modes
+  rowColorSource.style.display = (targetColors.mode === 'single') ? 'none' : 'flex';
 
   if (targetColors.mode === 'multi-gradient') {
     renderMultiGradientEditor(targetColors);
@@ -1569,15 +1577,28 @@ colorModeSelect.addEventListener('change', (e) => {
   const selected = layers.filter(l => l.selected);
   if (selected.length > 0) {
     selected.forEach(l => {
-      // Ensure colors object exists
       if (!l.colors) l.colors = JSON.parse(JSON.stringify(vizColors));
       l.colors.mode = mode;
     });
   } else {
     vizColors.mode = mode;
   }
-  updateSortedStops();
   renderColorEditor();
+  updatePreview();
+});
+
+colorSourceSelect.addEventListener('change', (e) => {
+  const source = e.target.value;
+  const selected = layers.filter(l => l.selected);
+  if (selected.length > 0) {
+    selected.forEach(l => {
+      if (!l.colors) l.colors = JSON.parse(JSON.stringify(vizColors));
+      l.colors.source = source;
+    });
+  } else {
+    vizColors.source = source;
+  }
+  updateSortedStops();
   updatePreview();
 });
 
@@ -1817,12 +1838,13 @@ settingLineWeightInput.addEventListener('input', (e) => {
 function updateIntensitySafe(val) {
   if (isNaN(val) || val < 0.1) return;
   const selectedLayers = layers.filter(l => l.selected);
-  const targets = selectedLayers.length > 0 ? selectedLayers : layers;
 
-  targets.forEach(layer => {
+  // If no layers are selected, do nothing (scoped to individual layers)
+  if (selectedLayers.length === 0) return;
+
+  selectedLayers.forEach(layer => {
     if (!layer.vizSettings) layer.vizSettings = {};
     if (!layer.vizSettings[layer.type]) {
-      // Fallback or use defaults? Let's just create the object
       layer.vizSettings[layer.type] = { intensity: val };
     } else {
       layer.vizSettings[layer.type].intensity = val;

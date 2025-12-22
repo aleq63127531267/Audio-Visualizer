@@ -1,3 +1,5 @@
+import { getColorFromStops, getMultiGradientColor } from '../utils/colorUtils.js';
+
 // Default settings
 const DEFAULTS = {
     radius: 150
@@ -38,10 +40,11 @@ export function drawCircleLinear(ctx, canvas, dataArray, bufferLength, vizColors
         [...vizColors.stops].sort((a, b) => a.offset - b.offset);
 
     let strokeStyle;
+    const useFreqSource = (vizColors.source !== 'volume');
 
     if (vizColors.mode === 'single') {
         strokeStyle = sortedStops[0]?.color || '#fff';
-    } else if (vizColors.mode === 'gradient-freq') {
+    } else if (vizColors.mode === 'gradient' && useFreqSource) {
         // Check gradient cache
         const gradientKey = getGradientKey(vizColors.mode, sortedStops, centerX, centerY, radius);
         if (cachedGradientKey === gradientKey && cachedGradient) {
@@ -55,7 +58,7 @@ export function drawCircleLinear(ctx, canvas, dataArray, bufferLength, vizColors
             cachedGradient = gradient;
             cachedGradientKey = gradientKey;
         }
-    } else if (vizColors.mode === 'multi-gradient' && vizColors.multiGradients) {
+    } else if (vizColors.mode === 'multi-gradient' && useFreqSource && vizColors.multiGradients) {
         const gradientKey = getGradientKey(vizColors.mode, vizColors.multiGradients, centerX, centerY, radius);
         if (cachedGradientKey === gradientKey && cachedGradient) {
             strokeStyle = cachedGradient;
@@ -73,7 +76,7 @@ export function drawCircleLinear(ctx, canvas, dataArray, bufferLength, vizColors
         }
     }
 
-    ctx.strokeStyle = strokeStyle || '#fff';
+    if (strokeStyle) ctx.strokeStyle = strokeStyle;
     ctx.beginPath();
 
     for (let i = 0; i < bufferLength; i++) {
@@ -88,10 +91,24 @@ export function drawCircleLinear(ctx, canvas, dataArray, bufferLength, vizColors
         const xEnd = centerX + Math.cos(angle) * (radius + barHeight);
         const yEnd = centerY + Math.sin(angle) * (radius + barHeight);
 
+        if (!useFreqSource) {
+            ctx.stroke();
+            ctx.beginPath();
+            const t = value / 255;
+            if (vizColors.mode === 'multi-gradient') {
+                ctx.strokeStyle = getMultiGradientColor(vizColors.multiGradients, t);
+            } else {
+                ctx.strokeStyle = getColorFromStops(sortedStops, t);
+            }
+        }
+
         ctx.moveTo(xStart, yStart);
         ctx.lineTo(xEnd, yEnd);
+
+        if (!useFreqSource) ctx.stroke();
     }
-    ctx.stroke();
+
+    if (useFreqSource) ctx.stroke();
 }
 
 /**
