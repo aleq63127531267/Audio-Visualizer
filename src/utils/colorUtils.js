@@ -75,3 +75,32 @@ export function getColorFromStops(stops, t) {
 
     return `rgb(${r},${g},${b})`;
 }
+
+/**
+ * Get color from multi-gradient setup
+ * @param {Array} multiGradients - Array of gradient segments
+ * @param {number} t - Position (0-1)
+ * @returns {string} RGB color string
+ */
+export function getMultiGradientColor(multiGradients, t) {
+    const tPerc = t * 100;
+
+    // Find segments that cover this t
+    const activeSegments = multiGradients.filter(g => tPerc >= g.start && tPerc <= g.end);
+
+    if (activeSegments.length === 0) {
+        // Fallback to nearest or transparent? Let's use black or nearest.
+        return 'rgb(0,0,0)';
+    }
+
+    // If multiple overlap, we could blend or just take the first. 
+    // Let's blend them based on their influence at this point? 
+    // Simple version for now: Use the first one found.
+    const segment = activeSegments[0];
+
+    // Normalize t within the segment
+    const range = segment.end - segment.start;
+    const localT = range === 0 ? 0 : (tPerc - segment.start) / range;
+
+    return getColorFromStops(segment.stops, localT);
+}

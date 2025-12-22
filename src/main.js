@@ -3,7 +3,9 @@ import { drawBars, invalidateBarsCache } from './visualizers/bars.js';
 import { drawCircle, invalidateCircleCache } from './visualizers/circle.js';
 import { drawCircleLinear, invalidateCircleLinearCache } from './visualizers/circle-linear.js';
 import { drawParticles, scaleParticles, setParticleCount, setParticleSize } from './visualizers/particles.js';
-import { drawProximityDots, scaleProximityNodes, setNodeSize, setLineWeight } from './visualizers/proximityDots.js';
+import { drawProximityDots, scaleProximityNodes, setNodeSize, setLineWeight, setIntensity } from './visualizers/proximityDots.js';
+import { drawFlash } from './visualizers/flash.js';
+import { drawCrystalWall } from './visualizers/crystalWall.js';
 
 const canvas = document.getElementById('visualizer-canvas');
 const ctx = canvas.getContext('2d');
@@ -153,7 +155,9 @@ const visualizers = {
   'circle': drawCircle,
   'circle-linear': drawCircleLinear,
   'particles': drawParticles,
-  'proximityDots': drawProximityDots
+  'proximityDots': drawProximityDots,
+  'flash': drawFlash,
+  'crystalWall': drawCrystalWall
 };
 
 function formatTime(seconds) {
@@ -217,6 +221,13 @@ function renderLayersList() {
   displayLayers.forEach(({ layer, index }) => {
     const item = document.createElement('div');
     item.className = 'layer-item';
+    item.draggable = true; // Enable dragging
+
+    // Drag Handle
+    const dragHandle = document.createElement('div');
+    dragHandle.className = 'drag-handle';
+    dragHandle.textContent = '⠿';
+    item.appendChild(dragHandle);
 
     // Classes
     if (layer.selected) item.classList.add('selected');
@@ -274,6 +285,39 @@ function renderLayersList() {
         }
 
         updateUI();
+        renderLayersList();
+      }
+    });
+
+    // Drag and Drop Events
+    item.addEventListener('dragstart', (e) => {
+      e.dataTransfer.setData('text/plain', index);
+      item.classList.add('dragging');
+    });
+
+    item.addEventListener('dragend', () => {
+      item.classList.remove('dragging');
+      // Remove all drop-over classes just in case
+      document.querySelectorAll('.layer-item').forEach(el => el.classList.remove('drop-over'));
+    });
+
+    item.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      item.classList.add('drop-over');
+    });
+
+    item.addEventListener('dragleave', () => {
+      item.classList.remove('drop-over');
+    });
+
+    item.addEventListener('drop', (e) => {
+      e.preventDefault();
+      item.classList.remove('drop-over');
+      const fromIndex = parseInt(e.dataTransfer.getData('text/plain'));
+      if (fromIndex !== index) {
+        // Move layer in array
+        const movedLayer = layers.splice(fromIndex, 1)[0];
+        layers.splice(index, 0, movedLayer);
         renderLayersList();
       }
     });
@@ -648,12 +692,16 @@ const previewCtx = previewCanvas.getContext('2d');
 
 // Color State with pre-sorted stops for performance
 let vizColors = {
-  mode: 'gradient-freq', // 'gradient-freq', 'gradient-vol', 'single'
+  mode: 'gradient-freq',
   stops: [
-    { offset: 0, color: '#00ffff' },
-    { offset: 100, color: '#ff00ff' }
+    { offset: 0, color: '#ff0000' },
+    { offset: 100, color: '#ffff00' }
   ],
-  sortedStops: null // Will be populated on change
+  sortedStops: [],
+  multiGradients: [
+    { start: 0, end: 50, stops: [{ offset: 0, color: '#ff0000' }, { offset: 100, color: '#0000ff' }] },
+    { start: 50, end: 100, stops: [{ offset: 0, color: '#00ff00' }, { offset: 100, color: '#ffff00' }] }
+  ]
 };
 
 
@@ -1321,6 +1369,11 @@ function renderColorEditor() {
   colorStopsContainer.innerHTML = '';
   colorModeSelect.value = targetColors.mode;
 
+  if (targetColors.mode === 'multi-gradient') {
+    renderMultiGradientEditor(targetColors);
+    return;
+  }
+
   targetColors.stops.sort((a, b) => a.offset - b.offset);
 
   targetColors.stops.forEach((stop, index) => {
@@ -1364,15 +1417,6 @@ function renderColorEditor() {
       btnRemove.className = 'btn-remove-stop';
       btnRemove.textContent = '×';
       btnRemove.onclick = () => {
-        const selected = layers.filter(l => l.selected);
-        if (selected.length > 0) {
-          selected.forEach(l => l.colors.stops.splice(index, 1));
-        } else {
-          vizColors.stops.splice(index, 1);
-        }
-        updateSortedStops();
-        renderColorEditor();
-        updatePreview();
       };
       if (targetColors.stops.length > 1) row.appendChild(btnRemove);
     }
@@ -1389,6 +1433,18 @@ function updatePreview() {
   const h = previewCanvas.height;
   if (targetColors.mode === 'single') {
     previewCtx.fillStyle = targetColors.stops[0]?.color || '#fff';
+    previewCtx.fillRect(0, 0, w, h);
+    return;
+  }
+  if (targetColors.mode === 'multi-gradient' && targetColors.multiGradients) {
+    const gradient = previewCtx.createLinearGradient(0, 0, w, 0);
+    targetColors.multiGradients.forEach(grad => {
+      grad.stops.forEach(s => {
+        const masterOffset = grad.start + (s.offset / 100) * (grad.end - grad.start);
+        gradient.addColorStop(Math.min(1, Math.max(0, masterOffset / 100)), s.color);
+      });
+    });
+    previewCtx.fillStyle = gradient;
     previewCtx.fillRect(0, 0, w, h);
     return;
   }
@@ -1450,6 +1506,9 @@ const settingParticleSizeInput = document.getElementById('setting-particle-size-
 const rowLineWeight = document.getElementById('row-line-weight');
 const settingLineWeight = document.getElementById('setting-line-weight');
 const settingLineWeightInput = document.getElementById('setting-line-weight-input');
+const rowIntensity = document.getElementById('row-intensity');
+const settingIntensity = document.getElementById('setting-intensity');
+const settingIntensityInput = document.getElementById('setting-intensity-input');
 
 // Settings Logic
 
@@ -1461,6 +1520,7 @@ function updateSettingsVisibility() {
     rowParticles.classList.add('disabled');
     rowParticleSize.classList.add('disabled');
     rowLineWeight.classList.add('disabled');
+    rowIntensity.classList.add('disabled');
     return;
   }
 
@@ -1474,22 +1534,32 @@ function updateSettingsVisibility() {
     rowParticles.classList.remove('disabled');
     rowParticleSize.classList.remove('disabled');
     rowLineWeight.classList.add('disabled');
+    rowIntensity.classList.remove('disabled');
   } else if (currentViz === 'proximityDots') {
     rowDetail.classList.add('disabled');
     rowParticles.classList.add('disabled');
     rowParticleSize.classList.remove('disabled');
     rowLineWeight.classList.remove('disabled');
+    rowIntensity.classList.remove('disabled');
+  } else if (currentViz === 'crystalWall') {
+    rowDetail.classList.add('disabled');
+    rowParticles.classList.add('disabled');
+    rowParticleSize.classList.add('disabled');
+    rowLineWeight.classList.add('disabled');
+    rowIntensity.classList.remove('disabled');
   } else if (currentViz === 'mixed') {
     // Both could be relevant or neither depending on mix, but let's disable for safety in "mixed"
     rowDetail.classList.add('disabled');
     rowParticles.classList.add('disabled');
     rowParticleSize.classList.add('disabled');
     rowLineWeight.classList.add('disabled');
+    rowIntensity.classList.add('disabled');
   } else {
     rowDetail.classList.remove('disabled');
     rowParticles.classList.add('disabled');
     rowParticleSize.classList.add('disabled');
     rowLineWeight.classList.add('disabled');
+    rowIntensity.classList.remove('disabled');
   }
 
   // Update Detail UI
@@ -1529,6 +1599,12 @@ function updateSettingsVisibility() {
   const allSameWeight = selectedLayers.every(l => (l.vizSettings?.proximityDots?.lineWeight || 1) === firstWeight);
   settingLineWeight.value = allSameWeight ? firstWeight : 1;
   settingLineWeightInput.value = allSameWeight ? firstWeight : '-';
+
+  // Update Intensity UI
+  const firstIntensity = selectedLayers[0].vizSettings?.[selectedLayers[0].type]?.intensity || 1;
+  const allSameIntensity = selectedLayers.every(l => (l.vizSettings?.[l.type]?.intensity || 1) === firstIntensity);
+  settingIntensity.value = allSameIntensity ? firstIntensity : 1;
+  settingIntensityInput.value = allSameIntensity ? firstIntensity : '-';
 }
 
 btnSettings.addEventListener('click', () => {
@@ -1633,6 +1709,36 @@ settingLineWeightInput.addEventListener('input', (e) => {
   if (!isNaN(val) && val > 0) {
     settingLineWeight.value = val;
     updateLineWeightSafe(val);
+  }
+});
+
+function updateIntensitySafe(val) {
+  if (isNaN(val) || val < 0.1) return;
+  const selectedLayers = layers.filter(l => l.selected);
+  const targets = selectedLayers.length > 0 ? selectedLayers : layers;
+
+  targets.forEach(layer => {
+    if (!layer.vizSettings) layer.vizSettings = {};
+    if (!layer.vizSettings[layer.type]) {
+      // Fallback or use defaults? Let's just create the object
+      layer.vizSettings[layer.type] = { intensity: val };
+    } else {
+      layer.vizSettings[layer.type].intensity = val;
+    }
+  });
+}
+
+settingIntensity.addEventListener('input', (e) => {
+  const val = parseFloat(e.target.value);
+  settingIntensityInput.value = val;
+  updateIntensitySafe(val);
+});
+
+settingIntensityInput.addEventListener('input', (e) => {
+  const val = parseFloat(e.target.value);
+  if (!isNaN(val) && val > 0) {
+    settingIntensity.value = val;
+    updateIntensitySafe(val);
   }
 });
 

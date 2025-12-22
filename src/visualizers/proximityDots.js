@@ -1,4 +1,4 @@
-import { hexToRgb } from '../utils/colorUtils.js';
+import { hexToRgb, getMultiGradientColor } from '../utils/colorUtils.js';
 
 // Default settings
 const DEFAULTS = {
@@ -7,7 +7,8 @@ const DEFAULTS = {
     speed: 1.0,
     pulseStrength: 0.8,
     baseSize: 2,
-    lineWeight: 1
+    lineWeight: 1,
+    intensity: 1.0
 };
 
 /**
@@ -29,6 +30,7 @@ export function drawProximityDots(ctx, canvas, dataArray, bufferLength, vizColor
     const PULSE = settings.pulseStrength || DEFAULTS.pulseStrength;
     const BASE_SIZE = settings.baseSize || DEFAULTS.baseSize;
     const LINE_WEIGHT = settings.lineWeight || DEFAULTS.lineWeight;
+    const INTENSITY = settings.intensity || DEFAULTS.intensity;
 
     // Init State
     if (!layer.vizState || !layer.vizState.nodes ||
@@ -70,7 +72,8 @@ export function drawProximityDots(ctx, canvas, dataArray, bufferLength, vizColor
             sum += dataArray[i];
         }
     }
-    const energy = bassBins > 0 ? (sum / bassBins / 255) : 0; // Guard against NaN
+    const rawEnergy = bassBins > 0 ? (sum / bassBins / 255) : 0;
+    const energy = Math.pow(rawEnergy, 0.7) * INTENSITY;
     const pulseFactor = 1 + energy * PULSE;
 
     // Detect and repair NaN corruption
@@ -109,8 +112,13 @@ export function drawProximityDots(ctx, canvas, dataArray, bufferLength, vizColor
     const stopRGBs = stops.map(s => hexToRgb(s.color));
 
     nodes.forEach((nodeA, i) => {
-        const rgbA = stopRGBs[nodeA.colorIndex % stopRGBs.length] || { r: 255, g: 255, b: 255 };
-        const colorA = `rgb(${rgbA.r}, ${rgbA.g}, ${rgbA.b})`;
+        let colorA;
+        if (vizColors.mode === 'multi-gradient' && vizColors.multiGradients) {
+            colorA = getMultiGradientColor(vizColors.multiGradients, i / nodes.length);
+        } else {
+            const rgbA = stopRGBs[nodeA.colorIndex % stopRGBs.length] || { r: 255, g: 255, b: 255 };
+            colorA = `rgb(${rgbA.r}, ${rgbA.g}, ${rgbA.b})`;
+        }
 
         // Draw Node
         ctx.beginPath();
@@ -180,4 +188,14 @@ export function setLineWeight(weight, layer) {
     if (!layer.vizSettings) layer.vizSettings = {};
     if (!layer.vizSettings.proximityDots) layer.vizSettings.proximityDots = { ...DEFAULTS };
     layer.vizSettings.proximityDots.lineWeight = weight;
+}
+
+/**
+ * Set intensity for a specific layer
+ */
+export function setIntensity(val, layer) {
+    if (!layer) return;
+    if (!layer.vizSettings) layer.vizSettings = {};
+    if (!layer.vizSettings.proximityDots) layer.vizSettings.proximityDots = { ...DEFAULTS };
+    layer.vizSettings.proximityDots.intensity = val;
 }

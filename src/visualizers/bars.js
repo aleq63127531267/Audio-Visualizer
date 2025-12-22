@@ -18,6 +18,7 @@ export function drawBars(ctx, canvas, dataArray, bufferLength, vizColors, layer)
     // Get settings from layer or use defaults
     const settings = layer?.vizSettings?.bars || DEFAULTS;
     const barWidthMultiplier = settings.barWidthMultiplier || DEFAULTS.barWidthMultiplier;
+    const INTENSITY = settings.intensity || 1.0;
 
     if (!bufferLength || bufferLength === 0) return; // Proactive NaN guard
 
@@ -48,14 +49,17 @@ export function drawBars(ctx, canvas, dataArray, bufferLength, vizColors, layer)
             cachedGradient = gradient;
             cachedGradientKey = gradientKey;
         }
-    } else if (vizColors.mode === 'gradient-vol') {
-        const gradientKey = getGradientKey(vizColors.mode, sortedStops, width, height);
+    } else if (vizColors.mode === 'multi-gradient' && vizColors.multiGradients) {
+        const gradientKey = getGradientKey(vizColors.mode, vizColors.multiGradients, width, height);
         if (cachedGradientKey === gradientKey && cachedGradient) {
             fillStyle = cachedGradient;
         } else {
-            const gradient = ctx.createLinearGradient(0, height, 0, 0);
-            sortedStops.forEach(s => {
-                gradient.addColorStop(Math.min(1, Math.max(0, s.offset / 100)), s.color);
+            const gradient = ctx.createLinearGradient(0, 0, width, 0);
+            vizColors.multiGradients.forEach(grad => {
+                grad.stops.forEach(s => {
+                    const masterOffset = grad.start + (s.offset / 100) * (grad.end - grad.start);
+                    gradient.addColorStop(Math.min(1, Math.max(0, masterOffset / 100)), s.color);
+                });
             });
             fillStyle = gradient;
             cachedGradient = gradient;
@@ -66,7 +70,7 @@ export function drawBars(ctx, canvas, dataArray, bufferLength, vizColors, layer)
     ctx.fillStyle = fillStyle;
 
     for (let i = 0; i < bufferLength; i++) {
-        barHeight = dataArray[i];
+        barHeight = dataArray[i] * INTENSITY;
         ctx.fillRect(x, height - barHeight * 1.5, barWidth, barHeight * 1.5);
         x += barWidth + 1;
     }

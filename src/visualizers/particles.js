@@ -1,4 +1,4 @@
-import { hexToRgbString, getColorFromStops } from '../utils/colorUtils.js';
+import { hexToRgbString, getColorFromStops, getMultiGradientColor } from '../utils/colorUtils.js';
 
 // Default settings
 const DEFAULTS = {
@@ -20,9 +20,9 @@ class Particle {
         this.color = '#ffffff';
     }
 
-    update(frequencyData, bufferLength, vizColors, sortedStops, particleCount) {
-        this.x += this.speedX;
-        this.y += this.speedY;
+    update(frequencyData, bufferLength, vizColors, sortedStops, particleCount, intensity = 1.0) {
+        this.x += this.speedX * intensity;
+        this.y += this.speedY * intensity;
 
         // Wrap
         if (this.x < 0) this.x = this.canvas.width;
@@ -35,18 +35,24 @@ class Particle {
         this.currentValue = value;
 
         // Pulsate: add size based on volume
-        this.currentSize = this.baseSize + (value / 255) * 10;
+        this.currentSize = this.baseSize + (value / 255) * 10 * intensity;
 
         // Color Calculation
         if (vizColors.mode === 'single') {
             this.color = sortedStops[0] ? hexToRgbString(sortedStops[0].color) : '#fff';
+        } else if (vizColors.mode === 'multi-gradient' && vizColors.multiGradients) {
+            let t = 0;
+            if (vizColors.mode === 'gradient-freq') { // This shouldn't happen in multi-gradient mode usually, but safety first
+                t = this.index / particleCount;
+            } else {
+                t = this.index / particleCount; // For particles, we usually map index to spectrum
+            }
+            this.color = getMultiGradientColor(vizColors.multiGradients, t);
         } else {
             let t = 0;
             if (vizColors.mode === 'gradient-freq') {
-                // Freq based (Index 0..particleCount)
                 t = this.index / particleCount;
             } else {
-                // Volume based
                 t = Math.min(1, value / 200);
             }
             this.color = getColorFromStops(sortedStops, t);
@@ -84,6 +90,7 @@ export function drawParticles(ctx, canvas, dataArray, bufferLength, vizColors, l
     const settings = layer.vizSettings?.particles || DEFAULTS;
     const particleCount = settings.particleCount || DEFAULTS.particleCount;
     const baseSize = settings.baseSize || DEFAULTS.baseSize;
+    const INTENSITY = settings.intensity || 1.0;
 
     // Initialize State if needed
     if (!layer.vizState || !layer.vizState.particles) {
@@ -118,7 +125,7 @@ export function drawParticles(ctx, canvas, dataArray, bufferLength, vizColors, l
         [...vizColors.stops].sort((a, b) => a.offset - b.offset);
 
     particles.forEach(p => {
-        p.update(dataArray, bufferLength, vizColors, sortedStops, particleCount);
+        p.update(dataArray, bufferLength, vizColors, sortedStops, particleCount, INTENSITY);
         p.draw(ctx);
     });
 }

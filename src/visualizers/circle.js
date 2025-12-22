@@ -20,6 +20,7 @@ export function drawCircle(ctx, canvas, dataArray, bufferLength, vizColors, laye
     // Get settings from layer or use defaults
     const settings = layer?.vizSettings?.circle || DEFAULTS;
     const radius = settings.radius || DEFAULTS.radius;
+    const INTENSITY = settings.intensity || 1.0;
 
     // Draw base circle
     ctx.beginPath();
@@ -55,14 +56,17 @@ export function drawCircle(ctx, canvas, dataArray, bufferLength, vizColors, laye
             cachedGradient = gradient;
             cachedGradientKey = gradientKey;
         }
-    } else if (vizColors.mode === 'gradient-vol') {
-        const gradientKey = getGradientKey(vizColors.mode, sortedStops, centerX, centerY, radius);
+    } else if (vizColors.mode === 'multi-gradient' && vizColors.multiGradients) {
+        const gradientKey = getGradientKey(vizColors.mode, vizColors.multiGradients, centerX, centerY, radius);
         if (cachedGradientKey === gradientKey && cachedGradient) {
             strokeStyle = cachedGradient;
         } else {
-            const gradient = ctx.createRadialGradient(centerX, centerY, radius, centerX, centerY, radius + 100);
-            sortedStops.forEach(s => {
-                gradient.addColorStop(Math.min(1, Math.max(0, s.offset / 100)), s.color);
+            const gradient = ctx.createLinearGradient(0, centerY - radius - 50, 0, centerY + radius + 50);
+            vizColors.multiGradients.forEach(grad => {
+                grad.stops.forEach(s => {
+                    const masterOffset = grad.start + (s.offset / 100) * (grad.end - grad.start);
+                    gradient.addColorStop(Math.min(1, Math.max(0, masterOffset / 100)), s.color);
+                });
             });
             strokeStyle = gradient;
             cachedGradient = gradient;
@@ -76,7 +80,7 @@ export function drawCircle(ctx, canvas, dataArray, bufferLength, vizColors, laye
     // Right side (0 to PI)
     for (let i = 0; i < usableLength; i++) {
         const value = dataArray[i];
-        const barHeight = value * 0.8;
+        const barHeight = value * 0.8 * INTENSITY;
         const angle = (Math.PI * 1.5) + (i * angleStep);
 
         const xStart = centerX + Math.cos(angle) * radius;
@@ -91,7 +95,7 @@ export function drawCircle(ctx, canvas, dataArray, bufferLength, vizColors, laye
     // Left side (0 to -PI) mirror
     for (let i = 0; i < usableLength; i++) {
         const value = dataArray[i];
-        const barHeight = value * 0.8;
+        const barHeight = value * 0.8 * INTENSITY;
         const angle = (Math.PI * 1.5) - (i * angleStep);
 
         const xStart = centerX + Math.cos(angle) * radius;

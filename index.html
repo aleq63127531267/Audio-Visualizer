@@ -106,6 +106,7 @@
         <select id="color-mode">
           <option value="gradient-freq">Gradient (Frequency)</option>
           <option value="gradient-vol">Gradient (Volume)</option>
+          <option value="multi-gradient">Multi-Gradient</option>
           <option value="single">Single Color</option>
         </select>
       </div>
@@ -154,6 +155,14 @@
         <div style="display: flex; gap: 10px; align-items: center; flex-grow: 1;">
           <input type="range" id="setting-line-weight" min="1" max="10" value="1" step="0.5" style="flex-grow: 1;">
           <input type="text" id="setting-line-weight-input" value="1" style="width: 60px; text-align: center;">
+        </div>
+      </div>
+
+      <div id="row-intensity" class="color-row" title="Overall sensitivity boost for proximity dots">
+        <label>Intensity</label>
+        <div style="display: flex; gap: 10px; align-items: center; flex-grow: 1;">
+          <input type="range" id="setting-intensity" min="0.1" max="5" value="1" step="0.1" style="flex-grow: 1;">
+          <input type="text" id="setting-intensity-input" value="1" style="width: 60px; text-align: center;">
         </div>
       </div>
 
