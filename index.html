@@ -13,18 +13,31 @@
   <div id="app">
     <header id="app-header">
       <div class="header-left">
-        <h1>Audio Visualizer</h1>
+        <h1 data-i18n="app_title">Audio Visualizer</h1>
         <select id="tool-select">
           <option value="visualizer">Audio Visualizer</option>
         </select>
       </div>
-      <button id="btn-toggle-panel" class="icon-btn">☰ Layers</button>
+      <div class="header-right" style="display: flex; gap: 10px; align-items: center;">
+        <div class="lang-menu">
+          <select id="lang-select" class="icon-btn-select"
+            style="background: transparent; border: none; font-size: 1.2rem; cursor: pointer;" title="Language">
+            <option value="en">🇬🇧</option>
+            <option value="ru">🇷🇺</option>
+            <option value="am">🇦🇲</option>
+          </select>
+        </div>
+        <button id="btn-experimental" class="icon-btn" title="Experimental Features"
+          style="width: auto; padding: 0 10px; font-size: 0.9rem;">Experimental</button>
+        <button id="btn-help" class="icon-btn" title="Start Tutorial" style="width: auto; padding: 0 10px;">?</button>
+        <button id="btn-toggle-panel" class="icon-btn" data-i18n="btn_layers">☰ Layers</button>
+      </div>
     </header>
 
     <div id="main-content">
       <aside id="side-panel" class="hidden">
         <div class="panel-header">
-          <h2>Visualizers</h2>
+          <h2 data-i18n="panel_viz">Visualizers</h2>
           <div class="panel-controls">
             <button id="btn-layer-delete-mode" title="Toggle Delete Mode" class="icon-btn">🗑</button>
             <button id="btn-select-all" title="Select/Deselect All" class="icon-btn">☑</button>
@@ -36,8 +49,11 @@
         </div>
 
         <div class="panel-header">
-          <h2>Saved Recordings</h2>
+          <h2 data-i18n="panel_recs">Saved Recordings</h2>
           <div class="panel-controls">
+            <button id="btn-filter-used" title="Show Used Only" class="small-btn" data-i18n="filter_used">Used</button>
+            <button id="btn-filter-unused" title="Show Unused Only" class="small-btn"
+              data-i18n="filter_unused">Unused</button>
             <button id="btn-select-all-recs" title="Select/Deselect All" class="icon-btn">☑</button>
             <button id="btn-rec-delete-mode" title="Toggle Delete Mode" class="icon-btn">🗑</button>
           </div>
@@ -56,9 +72,12 @@
     <div id="ui-container">
       <div class="controls">
         <div class="file-info-bar">
-          <input type="file" id="audio-upload" accept="audio/*">
-          <button id="btn-test">Test Freq</button>
-          <div id="file-name">No file chosen</div>
+          <input type="file" id="audio-upload" accept="audio/*,video/*">
+          <button id="btn-test" data-i18n="btn_test">Test Freq</button>
+          <button id="btn-upload-bg" data-i18n="btn_bg">BG</button>
+          <input type="file" id="bg-upload" accept="image/*,video/*" style="display: none;">
+          <div id="file-name" data-i18n="file_no_chosen">No file chosen</div>
+
         </div>
 
         <div class="scrubber-container">
@@ -70,159 +89,183 @@
 
         <div class="controls-row">
           <div class="playback-controls">
-            <button id="btn-play">Play</button>
-            <button id="btn-pause">Pause</button>
-            <button id="btn-stop">Stop</button>
+            <button id="btn-play" data-i18n="btn_play">Play</button>
+            <button id="btn-pause" data-i18n="btn_pause">Pause</button>
+            <button id="btn-stop" data-i18n="btn_stop">Stop</button>
           </div>
 
           <div class="viz-options">
             <!-- viz-select removed -->
-            <button id="btn-colors">Customize Colors</button>
-            <button id="btn-settings">Settings</button>
-            <button id="btn-record">Record Mode</button>
+            <button id="btn-colors" data-i18n="btn_colors">Customize Colors</button>
+            <button id="btn-settings" data-i18n="btn_settings">Settings</button>
+            <button id="btn-record" data-i18n="btn_record_mode">Record Mode</button>
           </div>
         </div>
 
         <div class="controls-divider"></div>
 
         <div class="controls-row input-controls">
-          <span class="control-label">Live Input:</span>
-          <button id="btn-mic-toggle">🎤 Mic: OFF</button>
+          <span class="control-label" data-i18n="lbl_live_input">Live Input:</span>
+          <button id="btn-mic-toggle" data-i18n="btn_mic_off">🎤 Mic: OFF</button>
           <select id="mic-select">
             <option value="default">Default Input</option>
           </select>
-          <button id="btn-record-mic" title="Record from Mic">● Rec</button>
+          <button id="btn-record-mic" title="Record from Mic" data-i18n="btn_rec">● Rec</button>
         </div>
       </div>
     </div>
-  </div>
 
-  <div id="panels-container">
-    <div id="color-panel" class="color-panel hidden">
-      <h3>Visualizer Colors</h3>
-
-      <div class="color-row">
-        <label>Mode</label>
-        <select id="color-mode">
-          <option value="gradient">Gradient</option>
-          <option value="multi-gradient">Multi-Gradient</option>
-          <option value="single">Single Color</option>
-        </select>
-      </div>
-
-      <div id="row-color-source" class="color-row">
-        <label>Source</label>
-        <select id="color-source">
-          <option value="frequency">Frequency</option>
-          <option value="volume">Volume</option>
-        </select>
-      </div>
-
-      <div class="gradient-preview-container">
-        <canvas id="gradient-preview" width="250" height="20"></canvas>
-      </div>
-
-      <div id="color-stops-container">
-        <!-- Stops injected by JS -->
-      </div>
-
-      <button id="btn-add-stop" class="small-btn">+ Add Color</button>
-      <button id="btn-close-colors">Close</button>
+    <div class="global-controls">
+      <button id="btn-global-play" class="icon-btn" title="Play All">▶</button>
+      <button id="btn-global-pause" class="icon-btn" title="Pause All">⏸</button>
+      <button id="btn-global-stop" class="icon-btn" title="Stop All">⏹</button>
+      <button id="btn-toggle-bg" class="icon-btn" title="Toggle Background">🖼️</button>
     </div>
 
-    <div id="settings-panel" class="color-panel hidden">
-      <h3>Visualizer Settings</h3>
 
-      <div id="row-detail" class="color-row" title="Smoothness/Number of Bars">
-        <label>Detail Level</label>
-        <div style="display: flex; gap: 10px; align-items: center; flex-grow: 1;">
-          <input type="range" id="setting-detail" min="1" max="6" value="3" step="1" style="flex-grow: 1;">
-          <span id="label-detail" style="width: 70px; text-align: right; font-size: 0.85rem; opacity: 0.8;">Med</span>
+    <div id="panels-container">
+      <div id="color-panel" class="color-panel hidden">
+        <h3 data-i18n="header_viz_colors">Visualizer Colors</h3>
+
+        <div class="color-row">
+          <label data-i18n="lbl_mode">Mode</label>
+          <select id="color-mode">
+            <option value="gradient">Gradient</option>
+            <option value="multi-gradient">Multi-Gradient</option>
+            <option value="single">Single Color</option>
+          </select>
         </div>
+
+        <div id="row-color-source" class="color-row">
+          <label data-i18n="lbl_source">Source</label>
+          <select id="color-source">
+            <option value="frequency">Frequency</option>
+            <option value="volume">Volume</option>
+          </select>
+        </div>
+
+        <div class="gradient-preview-container">
+          <canvas id="gradient-preview" width="250" height="20"></canvas>
+        </div>
+
+        <div id="color-stops-container">
+          <!-- Stops injected by JS -->
+        </div>
+
+        <button id="btn-add-stop" class="small-btn" data-i18n="btn_add_color">+ Add Color</button>
+        <button id="btn-close-colors" data-i18n="btn_close">Close</button>
       </div>
 
-      <div id="row-particles" class="color-row" title="Number of Particles">
-        <label>Particle Count</label>
-        <div style="display: flex; gap: 10px; align-items: center; flex-grow: 1;">
-          <input type="range" id="setting-particles" min="50" max="500" value="150" step="10" style="flex-grow: 1;">
-          <input type="text" id="setting-particles-input" value="150" style="width: 60px; text-align: center;">
-        </div>
-      </div>
+      <div id="settings-panel" class="color-panel hidden">
+        <h3 data-i18n="header_viz_settings">Visualizer Settings</h3>
 
-      <div id="row-particle-size" class="color-row" title="Size of Particles/Nodes">
-        <label>Element Size</label>
-        <div style="display: flex; gap: 10px; align-items: center; flex-grow: 1;">
-          <input type="range" id="setting-particle-size" min="1" max="10" value="2" step="0.5" style="flex-grow: 1;">
-          <input type="text" id="setting-particle-size-input" value="2" style="width: 60px; text-align: center;">
+        <div id="row-detail" class="color-row" title="Smoothness/Number of Bars">
+          <label data-i18n="lbl_detail">Detail Level</label>
+          <div style="display: flex; gap: 10px; align-items: center; flex-grow: 1;">
+            <input type="range" id="setting-detail" min="1" max="6" value="3" step="1" style="flex-grow: 1;">
+            <span id="label-detail" style="width: 70px; text-align: right; font-size: 0.85rem; opacity: 0.8;">Med</span>
+          </div>
         </div>
-      </div>
 
-      <div id="row-line-weight" class="color-row" title="Line thickness for connections">
-        <label>Line Weight</label>
-        <div style="display: flex; gap: 10px; align-items: center; flex-grow: 1;">
-          <input type="range" id="setting-line-weight" min="1" max="10" value="1" step="0.5" style="flex-grow: 1;">
-          <input type="text" id="setting-line-weight-input" value="1" style="width: 60px; text-align: center;">
+        <div id="row-particles" class="color-row" title="Number of Particles">
+          <label>Particle Count</label>
+          <div style="display: flex; gap: 10px; align-items: center; flex-grow: 1;">
+            <input type="range" id="setting-particles" min="50" max="500" value="150" step="10" style="flex-grow: 1;">
+            <input type="text" id="setting-particles-input" value="150" style="width: 60px; text-align: center;">
+          </div>
         </div>
-      </div>
 
-      <div id="row-intensity" class="color-row" title="Overall sensitivity boost for Constellation/Crystal Wall">
-        <label>Intensity</label>
-        <div style="display: flex; gap: 10px; align-items: center; flex-grow: 1;">
-          <input type="range" id="setting-intensity" min="0.1" max="5" value="1" step="0.1" style="flex-grow: 1;">
-          <input type="text" id="setting-intensity-input" value="1" style="width: 60px; text-align: center;">
+        <div id="row-particle-size" class="color-row" title="Size of Particles/Nodes">
+          <label>Element Size</label>
+          <div style="display: flex; gap: 10px; align-items: center; flex-grow: 1;">
+            <input type="range" id="setting-particle-size" min="1" max="10" value="2" step="0.5" style="flex-grow: 1;">
+            <input type="text" id="setting-particle-size-input" value="2" style="width: 60px; text-align: center;">
+          </div>
         </div>
-      </div>
 
-      <div id="row-node-speed" class="color-row" title="Movement speed of individual particles/dots">
-        <label>Node Speed</label>
-        <div style="display: flex; gap: 10px; align-items: center; flex-grow: 1;">
-          <input type="range" id="setting-node-speed" min="0.1" max="5" value="1" step="0.1" style="flex-grow: 1;">
-          <input type="text" id="setting-node-speed-input" value="1" style="width: 60px; text-align: center;">
+        <div id="row-line-weight" class="color-row" title="Line thickness for connections">
+          <label>Line Weight</label>
+          <div style="display: flex; gap: 10px; align-items: center; flex-grow: 1;">
+            <input type="range" id="setting-line-weight" min="1" max="10" value="1" step="0.5" style="flex-grow: 1;">
+            <input type="text" id="setting-line-weight-input" value="1" style="width: 60px; text-align: center;">
+          </div>
         </div>
-      </div>
 
-      <div id="row-anchor-speed" class="color-row" title="Drift speed of the grid (Crystal Wall only)">
-        <label>Anchor Speed</label>
-        <div style="display: flex; gap: 10px; align-items: center; flex-grow: 1;">
-          <input type="range" id="setting-anchor-speed" min="0.1" max="5" value="1" step="0.1" style="flex-grow: 1;">
-          <input type="text" id="setting-anchor-speed-input" value="1" style="width: 60px; text-align: center;">
+        <div id="row-intensity" class="color-row" title="Overall sensitivity boost for Constellation/Crystal Wall">
+          <label>Intensity</label>
+          <div style="display: flex; gap: 10px; align-items: center; flex-grow: 1;">
+            <input type="range" id="setting-intensity" min="0.1" max="5" value="1" step="0.1" style="flex-grow: 1;">
+            <input type="text" id="setting-intensity-input" value="1" style="width: 60px; text-align: center;">
+          </div>
         </div>
-      </div>
 
-      <button id="btn-close-settings">Close</button>
+        <div id="row-node-speed" class="color-row" title="Movement speed of individual particles/dots">
+          <label>Node Speed</label>
+          <div style="display: flex; gap: 10px; align-items: center; flex-grow: 1;">
+            <input type="range" id="setting-node-speed" min="0.1" max="5" value="1" step="0.1" style="flex-grow: 1;">
+            <input type="text" id="setting-node-speed-input" value="1" style="width: 60px; text-align: center;">
+          </div>
+        </div>
+
+        <div id="row-anchor-speed" class="color-row" title="Drift speed of the grid (Crystal Wall only)">
+          <label>Anchor Speed</label>
+          <div style="display: flex; gap: 10px; align-items: center; flex-grow: 1;">
+            <input type="range" id="setting-anchor-speed" min="0.1" max="5" value="1" step="0.1" style="flex-grow: 1;">
+            <input type="text" id="setting-anchor-speed-input" value="1" style="width: 60px; text-align: center;">
+          </div>
+        </div>
+
+        <button id="btn-close-settings">Close</button>
+      </div>
     </div>
-  </div>
 
-  <div id="countdown-overlay"></div>
-  <div id="exit-hint">Press ESC to Stop</div>
 
-  <div id="sound-modal" class="modal-overlay">
-    <div class="modal-content">
-      <h3>Choose Audio Source</h3>
-      <div id="source-choice" class="modal-options">
-        <button id="btn-custom-audio" class="modal-btn">Upload Custom Audio</button>
-        <button id="btn-builtin-audio" class="modal-btn primary">Use Built-in Audio</button>
-        <button id="btn-cancel-sound" class="modal-btn">Cancel</button>
-      </div>
-      <div id="built-in-selection" style="display: none;">
-        <h3>Select Track</h3>
-        <div id="built-in-list">
-          <!-- Tracks injected by JS -->
+    <div id="exit-hint" data-i18n="exit_hint">Press ESC to Stop</div>
+
+    <div id="sound-modal" class="modal-overlay">
+      <div class="modal-content">
+        <h3 data-i18n="modal_choose_source">Choose Audio Source</h3>
+        <div id="source-choice" class="modal-options">
+          <button id="btn-custom-audio" class="modal-btn" data-i18n="btn_custom_audio">Upload Custom Audio</button>
+          <button id="btn-builtin-audio" class="modal-btn primary" data-i18n="btn_builtin_audio">Use Built-in
+            Audio</button>
+          <button id="btn-cancel-sound" class="modal-btn" data-i18n="btn_cancel">Cancel</button>
         </div>
-        <button id="btn-back-to-source" class="modal-btn" style="width: 100%; margin-top: 15px;">Back</button>
+        <div id="built-in-selection" style="display: none;">
+          <h3>Select Track</h3>
+          <div id="built-in-list">
+            <!-- Tracks injected by JS -->
+          </div>
+          <button id="btn-back-to-source" class="modal-btn" style="width: 100%; margin-top: 15px;"
+            data-i18n="btn_back">Back</button>
+        </div>
       </div>
     </div>
-  </div>
 
-  <div id="alert-modal" class="modal-overlay">
-    <div class="modal-content">
-      <h3 id="alert-title">Notification</h3>
-      <p id="alert-message">This is a message.</p>
-      <button id="btn-alert-ok" class="modal-btn primary">OK</button>
+    <div id="alert-modal" class="modal-overlay">
+      <div class="modal-content">
+        <h3 id="alert-title">Notification</h3>
+        <p id="alert-message">This is a message.</p>
+        <button id="btn-alert-ok" class="modal-btn primary">OK</button>
+      </div>
     </div>
-  </div>
 
-  <script type="module" src="/src/main.js"></script>
+    <!-- Tutorial Overlay -->
+    <div id="tutorial-overlay" class="hidden">
+      <div id="tutorial-spotlight"></div>
+      <div id="tutorial-tooltip">
+        <h3 id="tut-title">Welcome</h3>
+        <p id="tut-text">Let's take a tour.</p>
+        <div class="tut-controls">
+          <button id="btn-tut-prev" class="small-btn">Prev</button>
+          <span id="tut-step">1/5</span>
+          <button id="btn-tut-next" class="small-btn">Next</button>
+          <button id="btn-tut-close" class="icon-btn">×</button>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
 </body>
 
 </html>

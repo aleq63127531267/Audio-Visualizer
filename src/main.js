@@ -6,6 +6,7 @@ import { drawParticles, scaleParticles, setParticleCount, setParticleSize, setNo
 import { drawConstellation, scaleConstellationNodes, setConstellationNodeSize, setConstellationLineWeight, setConstellationIntensity, setConstellationNodeSpeed } from './visualizers/constellation.js';
 import { drawFlash } from './visualizers/flash.js';
 import { drawCrystalWall, setAnchorSpeed, setNodeSpeed as setCrystalNodeSpeed } from './visualizers/crystalWall.js';
+import { translations } from './utils/i18n.js';
 
 const canvas = document.getElementById('visualizer-canvas');
 const ctx = canvas.getContext('2d');
@@ -33,7 +34,25 @@ const btnLoop = document.getElementById('btn-loop');
 const vizSelect = document.getElementById('viz-select');
 const seekBar = document.getElementById('seek-bar');
 const timeCurrent = document.getElementById('time-current');
-const timeDuration = document.getElementById('time-total'); // Note: ID changed in HTML? Let me check previous HTML edit.
+const timeDuration = document.getElementById('time-total');
+
+// Color / Settings Panels & Buttons
+const btnColors = document.getElementById('btn-colors');
+const btnRecord = document.getElementById('btn-record');
+const colorPanel = document.getElementById('color-panel');
+const btnCloseColors = document.getElementById('btn-close-colors');
+const countdownOverlay = document.getElementById('countdown-overlay');
+const exitHint = document.getElementById('exit-hint');
+
+// New Color DOM
+const colorModeSelect = document.getElementById('color-mode');
+const colorSourceSelect = document.getElementById('color-source');
+const rowColorSource = document.getElementById('row-color-source');
+const colorStopsContainer = document.getElementById('color-stops-container');
+const btnAddStop = document.getElementById('btn-add-stop');
+const previewCanvas = document.getElementById('gradient-preview');
+const previewCtx = previewCanvas.getContext('2d');
+// Note: ID changed in HTML? Let me check previous HTML edit.
 // In Step 402 HTML Edit: <span id="time-total">0:00</span>.
 // Previous main.js (Step 407 Line 18) was: const timeDuration = document.getElementById('time-duration');
 // But HTML had id="time-duration" before Step 402?
@@ -44,12 +63,24 @@ const timeDuration = document.getElementById('time-total'); // Note: ID changed 
 // So I must update the JS selector to 'time-total'.
 
 // Resize logic
-function resize() {
+function resize(forceBg) {
   const stage = document.getElementById('viz-stage');
-  if (!stage) return; // Guard for test/init
+  if (!stage) return;
 
-  const newW = stage.clientWidth;
-  const newH = stage.clientHeight;
+  let newW = stage.clientWidth;
+  let newH = stage.clientHeight;
+
+  // Fit to background if exists and visible
+  if (typeof backgroundState !== 'undefined' && backgroundState.element && backgroundState.visible) {
+    const media = backgroundState.element;
+    const mW = media.naturalWidth || media.videoWidth;
+    const mH = media.naturalHeight || media.videoHeight;
+    if (mW && mH) {
+      newW = mW;
+      newH = mH;
+    }
+  }
+
   const oldW = canvas.width;
   const oldH = canvas.height;
 
@@ -126,10 +157,18 @@ const recordingsList = document.getElementById('recordings-list');
 let isRecording = false;
 let mediaRecorder = null;
 let recordedChunks = [];
+const backgroundState = {
+  type: 'none',
+  element: null,
+  visible: true,
+  url: null
+};
+
 let recordings = []; // { id, url, name, blob }
 
 let animationId;
 let isSeeking = false;
+let currentMainFileName = 'No file loaded';
 let countdownInterval; // Global to allow clearing on exit
 let wasSidePanelOpen = false; // Track side panel state
 let lastSelectedLayerIndex = -1; // For range selection
@@ -296,37 +335,57 @@ function renderLayersList() {
     });
 
     // Drag and Drop Events
+    item.dataset.id = layer.id;
+
+    // Drag and Drop Events
     item.addEventListener('dragstart', (e) => {
-      e.dataTransfer.setData('text/plain', index);
       item.classList.add('dragging');
+      // e.dataTransfer.effectAllowed = 'move'; // Optional
     });
 
     item.addEventListener('dragend', () => {
-      item.draggable = false; // Re-disable
+      item.draggable = false;
       item.classList.remove('dragging');
-      // Remove all drop-over classes just in case
       document.querySelectorAll('.layer-item').forEach(el => el.classList.remove('drop-over'));
+
+      // Commit new order
+      // UI is Top-to-Bottom (Front-to-Back).
+      // Array should be Back-to-Front.
+      // So proper array order is Reverse of UI order.
+      const newOrder = Array.from(layersList.children)
+        .map(el => layers.find(l => l.id === el.dataset.id))
+        .filter(l => l) // Safety check
+        .reverse();
+
+      // Update global layers array
+      // Maintain the reference if possible, or just replace content
+      layers.length = 0;
+      layers.push(...newOrder);
+
+      renderLayersList();
     });
 
+    // Live Sort Logic
     item.addEventListener('dragover', (e) => {
       e.preventDefault();
-      item.classList.add('drop-over');
+      const draggingItem = document.querySelector('.layer-item.dragging');
+      if (!draggingItem || draggingItem === item) return;
+
+      const bounding = item.getBoundingClientRect();
+      const offset = bounding.y + (bounding.height / 2);
+
+      // If mouse is above the middle of the item, insert before it
+      // If below, insert after (which is insertBefore next sibling)
+      if (e.clientY - offset < 0) {
+        layersList.insertBefore(draggingItem, item);
+      } else {
+        layersList.insertBefore(draggingItem, item.nextSibling);
+      }
     });
 
-    item.addEventListener('dragleave', () => {
-      item.classList.remove('drop-over');
-    });
-
+    // Drop not strictly needed for logic but good for specific cleanup if needed
     item.addEventListener('drop', (e) => {
       e.preventDefault();
-      item.classList.remove('drop-over');
-      const fromIndex = parseInt(e.dataTransfer.getData('text/plain'));
-      if (fromIndex !== index) {
-        // Move layer in array
-        const movedLayer = layers.splice(fromIndex, 1)[0];
-        layers.splice(index, 0, movedLayer);
-        renderLayersList();
-      }
     });
 
     // Header
@@ -506,6 +565,17 @@ function renderLayersList() {
 }
 
 function addLayer() {
+  const newColors = {
+    ...JSON.parse(JSON.stringify(vizColors)),
+    source: 'frequency',
+    mode: 'gradient'
+  };
+
+  // Ensure sortedStops exists for immediate rendering
+  if (newColors.stops) {
+    newColors.sortedStops = [...newColors.stops].sort((a, b) => a.offset - b.offset);
+  }
+
   layers.push({
     id: 'layer-' + Date.now(),
     type: 'bars', // Default
@@ -513,7 +583,7 @@ function addLayer() {
     opacity: 1.0,
     selected: false,
     fftSize: 2048,
-    colors: JSON.parse(JSON.stringify(vizColors)) // Deep copy global defaults
+    colors: newColors
   });
   renderLayersList();
 }
@@ -563,6 +633,82 @@ function openSoundModal() {
   soundModal.classList.add('active');
   resetModalView();
 }
+
+// Experimental Features Logic
+const btnExperimental = document.getElementById('btn-experimental');
+let showExperimental = false;
+const optionMultiGradient = document.querySelector('#color-mode option[value="multi-gradient"]');
+
+const updateExperimentalUI = () => {
+  btnExperimental.classList.toggle('active', showExperimental);
+  if (optionMultiGradient) {
+    // Hide by default. Note: display:none on options works in Chrome/Firefox but not all browsers.
+    optionMultiGradient.style.display = showExperimental ? '' : 'none';
+    optionMultiGradient.disabled = !showExperimental;
+
+    // If hidden and currently selected, reset to default
+    if (!showExperimental && colorModeSelect.value === 'multi-gradient') {
+      colorModeSelect.value = 'gradient';
+      colorModeSelect.dispatchEvent(new Event('change'));
+    }
+  }
+};
+
+// Initialize
+updateExperimentalUI();
+
+btnExperimental.addEventListener('click', () => {
+  showExperimental = !showExperimental;
+  updateExperimentalUI();
+});
+
+
+// Force initial state? 
+// If it's "Experimental", it should be hidden by default.
+// btnColors.style.display = 'none'; // Visible by default now
+
+
+// Language Switcher Logic
+// Language Switcher Logic
+const langSelect = document.getElementById('lang-select');
+let currentLang = 'en';
+
+if (langSelect) {
+  langSelect.addEventListener('change', (e) => {
+    setLanguage(e.target.value);
+    langSelect.blur(); // Remove focus
+  });
+}
+
+function setLanguage(lang) {
+  if (!translations[lang]) return;
+  currentLang = lang;
+  updateLanguage();
+  if (langSelect) langSelect.value = lang;
+}
+
+function updateLanguage() {
+  const elements = document.querySelectorAll('[data-i18n]');
+  const dict = translations[currentLang];
+
+  elements.forEach(el => {
+    const key = el.dataset.i18n;
+    // Skip file name if customized
+    if (el.id === 'file-name' && currentMainFileName) return;
+
+    if (dict[key]) {
+      if (el.tagName === 'INPUT' && el.type === 'button') {
+        el.value = dict[key];
+      } else {
+        // Preserve any icon if it's separate? Currently icons are part of text in some buttons.
+        // My translation file includes icons (e.g. "🎤 Mic: OFF").
+        // So safe to replace.
+        el.textContent = dict[key];
+      }
+    }
+  });
+}
+
 
 function closeSoundModal() {
   soundModal.classList.remove('active');
@@ -682,21 +828,7 @@ fileInput.addEventListener('change', async (e) => {
 
 // Event listeners moved below to avoid duplication (see lines 605+)
 
-const btnColors = document.getElementById('btn-colors');
-const btnRecord = document.getElementById('btn-record');
-const colorPanel = document.getElementById('color-panel');
-const btnCloseColors = document.getElementById('btn-close-colors');
-const countdownOverlay = document.getElementById('countdown-overlay');
-const exitHint = document.getElementById('exit-hint'); // Should be there from HTML update
 
-// New Color DOM
-const colorModeSelect = document.getElementById('color-mode');
-const colorSourceSelect = document.getElementById('color-source');
-const rowColorSource = document.getElementById('row-color-source');
-const colorStopsContainer = document.getElementById('color-stops-container');
-const btnAddStop = document.getElementById('btn-add-stop');
-const previewCanvas = document.getElementById('gradient-preview');
-const previewCtx = previewCanvas.getContext('2d');
 
 
 // Color State with pre-sorted stops for performance
@@ -882,8 +1014,7 @@ function getSelectedLayerWithAudio() {
   return layers.find(l => l.selected && l.audio);
 }
 
-// State
-let currentMainFileName = 'No file loaded';
+
 
 function updateUI() {
   const selectedLayers = layers.filter(l => l.selected);
@@ -1058,6 +1189,44 @@ btnRecDeleteMode.addEventListener('click', () => {
   renderRecordingsList();
 });
 
+// Recording Filtering Logic
+const btnFilterUsed = document.getElementById('btn-filter-used');
+const btnFilterUnused = document.getElementById('btn-filter-unused');
+let recordingFilter = 'all'; // 'all', 'used', 'unused'
+
+function isRecordingUsed(rec) {
+  // Check if any layer uses this recording
+  return layers.some(l => l.audioName === rec.name || l.fileUrl === rec.url);
+}
+
+function updateFilterButtons() {
+  btnFilterUsed.classList.remove('active');
+  btnFilterUnused.classList.remove('active');
+
+  if (recordingFilter === 'used') btnFilterUsed.classList.add('active');
+  if (recordingFilter === 'unused') btnFilterUnused.classList.add('active');
+}
+
+btnFilterUsed.addEventListener('click', () => {
+  if (recordingFilter === 'used') {
+    recordingFilter = 'all'; // Toggle off
+  } else {
+    recordingFilter = 'used';
+  }
+  updateFilterButtons();
+  renderRecordingsList();
+});
+
+btnFilterUnused.addEventListener('click', () => {
+  if (recordingFilter === 'unused') {
+    recordingFilter = 'all'; // Toggle off
+  } else {
+    recordingFilter = 'unused';
+  }
+  updateFilterButtons();
+  renderRecordingsList();
+});
+
 btnSelectAllRecs.addEventListener('click', () => {
   // Deselect all layers first for mutual exclusivity
   layers.forEach(l => l.selected = false);
@@ -1069,15 +1238,30 @@ btnSelectAllRecs.addEventListener('click', () => {
   renderRecordingsList();
 });
 
+
+
 function renderRecordingsList() {
   recordingsList.innerHTML = '';
 
-  if (recordings.length === 0) {
-    recordingsList.innerHTML = '<div class="empty-state">No recordings yet</div>';
+  recordingsList.innerHTML = '';
+
+  let displayRecs = recordings;
+  if (recordingFilter === 'used') {
+    displayRecs = recordings.filter(r => isRecordingUsed(r));
+  } else if (recordingFilter === 'unused') {
+    displayRecs = recordings.filter(r => !isRecordingUsed(r));
+  }
+
+  if (displayRecs.length === 0) {
+    if (recordings.length === 0) {
+      recordingsList.innerHTML = '<div class="empty-state">No recordings yet</div>';
+    } else {
+      recordingsList.innerHTML = '<div class="empty-state">No matching recordings</div>';
+    }
     return;
   }
 
-  recordings.forEach(rec => {
+  displayRecs.forEach(rec => {
     const item = document.createElement('div');
     item.className = 'recording-item';
     if (rec.selected) item.classList.add('selected'); // Add selected state
@@ -1188,6 +1372,7 @@ function renderRecordingsList() {
     const controls = document.createElement('div');
     controls.className = 'recording-controls';
 
+
     // Rename Button
     const btnRename = document.createElement('button');
     btnRename.className = 'icon-btn';
@@ -1226,6 +1411,8 @@ function renderRecordingsList() {
 
     rec.audio.onended = () => {
       btnPlay.textContent = '▶';
+      rec.audio.currentTime = 0; // Reset to start
+      slider.value = 0;          // Update UI
     };
 
     // Stop
@@ -1292,9 +1479,12 @@ function animate() {
   // Clear Canvas Once
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  // Base background (optional, or just black)
+  // Base background
   ctx.fillStyle = '#000';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Draw User Background
+  if (typeof drawBackground === 'function') drawBackground();
 
   layers.forEach(layer => {
     if (!layer.visible) return;
@@ -1335,6 +1525,7 @@ function animate() {
     const vizFunc = visualizers[layer.type];
     if (vizFunc) {
       ctx.save();
+      ctx.globalCompositeOperation = 'source-over'; // Ensure standard blending by default
       ctx.globalAlpha = layer.opacity; // Use layer opacity
       vizFunc(ctx, canvas, drawDataArray, drawBufferLength, layerColors, layer);
       ctx.restore();
@@ -1692,7 +1883,7 @@ function updateSettingsVisibility() {
     rowParticles.classList.add('disabled');
     rowParticleSize.classList.add('disabled');
     rowLineWeight.classList.add('disabled');
-    rowIntensity.classList.add('disabled');
+    rowIntensity.classList.remove('disabled');
     rowNodeSpeed.classList.add('disabled');
     rowAnchorSpeed.classList.add('disabled');
   } else if (currentViz === 'flash') {
@@ -1882,10 +2073,10 @@ function updateIntensitySafe(val) {
   if (isNaN(val) || val < 0.1) return;
   const selectedLayers = layers.filter(l => l.selected);
 
-  // If no layers are selected, do nothing (scoped to individual layers)
-  if (selectedLayers.length === 0) return;
+  // Apply to all if none selected (consistent with other settings)
+  const targetLayers = selectedLayers.length > 0 ? selectedLayers : layers;
 
-  selectedLayers.forEach(layer => {
+  targetLayers.forEach(layer => {
     if (!layer.vizSettings) layer.vizSettings = {};
     if (!layer.vizSettings[layer.type]) {
       layer.vizSettings[layer.type] = { intensity: val };
@@ -1987,6 +2178,10 @@ function startRecordingMode() {
   // Pause all
   audioEngine.stop();
   layers.forEach(l => { if (l.audio) { l.audio.pause(); l.audio.currentTime = 0; } });
+  if (typeof backgroundState !== 'undefined' && backgroundState.type === 'video' && backgroundState.element) {
+    backgroundState.element.pause();
+    backgroundState.element.currentTime = 0;
+  }
 
   let count = 3;
   countdownOverlay.style.display = 'block';
@@ -2005,6 +2200,9 @@ function startRecordingMode() {
       // Play all assigned audios
       audioEngine.play();
       layers.forEach(l => { if (l.audio) l.audio.play(); });
+      if (typeof backgroundState !== 'undefined' && backgroundState.type === 'video' && backgroundState.element) {
+        backgroundState.element.play();
+      }
 
     }
   }, 1000);
@@ -2032,6 +2230,10 @@ function exitRecordingMode() {
 
   audioEngine.stop();
   layers.forEach(l => { if (l.audio) l.audio.pause(); });
+  if (typeof backgroundState !== 'undefined' && backgroundState.type === 'video' && backgroundState.element) {
+    backgroundState.element.pause();
+    backgroundState.element.currentTime = 0;
+  }
   document.body.classList.remove('recording-mode');
   if (document.fullscreenElement) document.exitFullscreen();
   countdownOverlay.style.display = 'none';
@@ -2067,4 +2269,215 @@ if (layers.length > 0) {
   if (!settingsPanel.classList.contains('hidden')) {
     updateSettingsVisibility();
   }
+}
+
+// Global Playback Controls
+const btnGlobalPlay = document.getElementById('btn-global-play');
+const btnGlobalPause = document.getElementById('btn-global-pause');
+const btnGlobalStop = document.getElementById('btn-global-stop');
+
+if (btnGlobalPlay) {
+  btnGlobalPlay.addEventListener('click', () => {
+    layers.forEach(layer => {
+      if (layer.audio) layer.audio.play().catch(e => console.warn(e));
+    });
+    // Sync Background Video
+    if (backgroundState.type === 'video' && backgroundState.element) {
+      backgroundState.element.play().catch(e => console.warn(e));
+    }
+  });
+}
+
+if (btnGlobalPause) {
+  btnGlobalPause.addEventListener('click', () => {
+    layers.forEach(layer => {
+      if (layer.audio) layer.audio.pause();
+    });
+    if (backgroundState.type === 'video' && backgroundState.element) {
+      backgroundState.element.pause();
+    }
+  });
+}
+
+if (btnGlobalStop) {
+  btnGlobalStop.addEventListener('click', () => {
+    layers.forEach(layer => {
+      if (layer.audio) {
+        layer.audio.pause();
+        layer.audio.currentTime = 0;
+      }
+    });
+    if (backgroundState.type === 'video' && backgroundState.element) {
+      backgroundState.element.pause();
+      backgroundState.element.currentTime = 0;
+    }
+  });
+}
+// Background Logic (Handlers)
+const btnUploadBg = document.getElementById('btn-upload-bg');
+const bgUploadInput = document.getElementById('bg-upload');
+const btnToggleBg = document.getElementById('btn-toggle-bg');
+
+if (btnUploadBg && bgUploadInput) {
+  btnUploadBg.addEventListener('click', () => bgUploadInput.click());
+  bgUploadInput.addEventListener('change', handleBgUpload);
+}
+
+if (btnToggleBg) {
+  btnToggleBg.addEventListener('click', () => {
+    backgroundState.visible = !backgroundState.visible;
+    btnToggleBg.style.opacity = backgroundState.visible ? '1' : '0.5';
+  });
+}
+
+function handleBgUpload(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const url = URL.createObjectURL(file);
+  backgroundState.url = url;
+
+  if (file.type.startsWith('video/')) {
+    backgroundState.type = 'video';
+    backgroundState.element = document.createElement('video');
+    backgroundState.element.src = url;
+    backgroundState.element.loop = true;
+    backgroundState.element.muted = true;
+    backgroundState.element.playsInline = true;
+    backgroundState.element.onloadedmetadata = () => {
+      fitCanvasToBackground();
+    };
+  } else {
+    backgroundState.type = 'image';
+    backgroundState.element = new Image();
+    backgroundState.element.src = url;
+    backgroundState.element.onload = () => {
+      fitCanvasToBackground();
+    };
+  }
+}
+
+function fitCanvasToBackground() {
+  if (!backgroundState.element) return;
+
+  const media = backgroundState.element;
+  const w = media.naturalWidth || media.videoWidth;
+  const h = media.naturalHeight || media.videoHeight;
+
+  if (w && h) {
+    canvas.width = w;
+    canvas.height = h;
+    resize(true); // pass flag to indicate we set size
+  }
+}
+
+function drawBackground() {
+  if (typeof backgroundState !== 'undefined' && backgroundState.visible && backgroundState.element) {
+    // Check validity
+    if (backgroundState.type === 'video' && backgroundState.element.readyState < 2) return;
+
+    try {
+      ctx.drawImage(backgroundState.element, 0, 0, canvas.width, canvas.height);
+
+      // Optional dimming overlay
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    } catch (e) {
+      // Ignore draw errors (e.g. empty source)
+    }
+  }
+}
+
+// Tutorial Logic
+const tutorialOverlay = document.getElementById('tutorial-overlay');
+const tutorialSpotlight = document.getElementById('tutorial-spotlight');
+const tutorialTooltip = document.getElementById('tutorial-tooltip');
+const elTutTitle = document.getElementById('tut-title');
+const elTutText = document.getElementById('tut-text');
+const elTutStep = document.getElementById('tut-step');
+const btnTutPrev = document.getElementById('btn-tut-prev');
+const btnTutNext = document.getElementById('btn-tut-next');
+const btnTutClose = document.getElementById('btn-tut-close');
+const btnHelp = document.getElementById('btn-help');
+
+let currentStepIndex = 0;
+
+const tutorialSteps = [
+  { target: '#btn-toggle-panel', title: 'Layers Panel', text: 'Open the sidebar to manage your visualizer layers. You can add, remove, or reorder them here.' },
+  { target: '#btn-add-viz', title: 'Add Visualizer', text: 'Click here to add new visualizer layers (Bars, Particles, etc.). You can stack multiple layers!', action: () => sidePanel.classList.remove('hidden') },
+  { target: '#visualizer-canvas', title: 'The Stage', text: 'This is where the magic happens. Your visualizers will react to the music here.' },
+  { target: '#btn-upload-bg', title: 'Backgrounds', text: 'Upload your own Image or Video to set the mood. Videos sync with playback automatically.' },
+  { target: '#btn-colors', title: 'Colors', text: 'Customize the color palette. Try "Multi-Gradient" for complex color shifting.', action: () => { sidePanel.classList.add('hidden'); } },
+  { target: '#btn-settings', title: 'Settings', text: 'Adjust fine-grained details like Particle Count, Line Weight, and Intensity.' },
+  { target: '.global-controls', title: 'Global Controls', text: 'Control playback for all layers and background videos from one convenient spot.' },
+  { target: '#btn-record', title: 'Record Mode', text: 'Create high-quality video exports of your visualizations.' }
+];
+
+function updateTutorialFocus() {
+  const step = tutorialSteps[currentStepIndex];
+  if (!step) return;
+
+  if (step.action) step.action();
+
+  const targetEl = document.querySelector(step.target);
+  if (targetEl) {
+    const rect = targetEl.getBoundingClientRect();
+    const pad = 10;
+
+    // Position Spotlight
+    tutorialSpotlight.style.width = `${rect.width + pad * 2}px`;
+    tutorialSpotlight.style.height = `${rect.height + pad * 2}px`;
+    tutorialSpotlight.style.top = `${rect.top - pad}px`;
+    tutorialSpotlight.style.left = `${rect.left - pad}px`;
+
+    // Position Tooltip
+    let tipTop = rect.bottom + 20;
+    let tipLeft = rect.left + rect.width / 2 - 150;
+
+    if (tipLeft < 10) tipLeft = 10;
+    if (tipLeft + 300 > window.innerWidth) tipLeft = window.innerWidth - 310;
+    if (tipTop + 150 > window.innerHeight) tipTop = rect.top - 180;
+
+    tutorialTooltip.style.top = `${tipTop}px`;
+    tutorialTooltip.style.left = `${tipLeft}px`;
+
+    elTutTitle.textContent = step.title;
+    elTutText.textContent = step.text;
+    elTutStep.textContent = `${currentStepIndex + 1}/${tutorialSteps.length}`;
+
+    btnTutPrev.disabled = currentStepIndex === 0;
+    btnTutNext.textContent = currentStepIndex === tutorialSteps.length - 1 ? 'Finish' : 'Next';
+  }
+}
+
+function startTutorial() {
+  currentStepIndex = 0;
+  tutorialOverlay.classList.remove('hidden');
+  updateTutorialFocus();
+}
+
+function endTutorial() {
+  tutorialOverlay.classList.add('hidden');
+}
+
+if (btnHelp) {
+  btnHelp.addEventListener('click', startTutorial);
+  btnTutClose.addEventListener('click', endTutorial);
+  btnTutNext.addEventListener('click', () => {
+    if (currentStepIndex < tutorialSteps.length - 1) {
+      currentStepIndex++;
+      updateTutorialFocus();
+    } else {
+      endTutorial();
+    }
+  });
+  btnTutPrev.addEventListener('click', () => {
+    if (currentStepIndex > 0) {
+      currentStepIndex--;
+      updateTutorialFocus();
+    }
+  });
+  window.addEventListener('resize', () => {
+    if (!tutorialOverlay.classList.contains('hidden')) updateTutorialFocus();
+  });
 }

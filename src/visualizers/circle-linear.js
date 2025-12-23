@@ -20,7 +20,8 @@ export function drawCircleLinear(ctx, canvas, dataArray, bufferLength, vizColors
     const centerY = height / 2;
 
     // Get settings from layer or use defaults
-    const settings = layer?.vizSettings?.circleLinear || DEFAULTS;
+    // Note: layer.type is 'circle-linear', so key in main.js is 'circle-linear'
+    const settings = layer?.vizSettings?.['circle-linear'] || layer?.vizSettings?.circleLinear || DEFAULTS;
     const radius = settings.radius || DEFAULTS.radius;
     const INTENSITY = settings.intensity || 1.0;
 
@@ -50,7 +51,8 @@ export function drawCircleLinear(ctx, canvas, dataArray, bufferLength, vizColors
         if (cachedGradientKey === gradientKey && cachedGradient) {
             strokeStyle = cachedGradient;
         } else {
-            const gradient = ctx.createConicGradient(-Math.PI / 2, centerX, centerY);
+            // Offset start slightly to avoid wrap-around artifact on first bar
+            const gradient = ctx.createConicGradient(-Math.PI / 2 - 0.05, centerX, centerY);
             sortedStops.forEach(s => {
                 gradient.addColorStop(Math.min(1, Math.max(0, s.offset / 100)), s.color);
             });
@@ -63,7 +65,7 @@ export function drawCircleLinear(ctx, canvas, dataArray, bufferLength, vizColors
         if (cachedGradientKey === gradientKey && cachedGradient) {
             strokeStyle = cachedGradient;
         } else {
-            const gradient = ctx.createConicGradient(-Math.PI / 2, centerX, centerY);
+            const gradient = ctx.createConicGradient(-Math.PI / 2 - 0.05, centerX, centerY);
             vizColors.multiGradients.forEach(grad => {
                 grad.stops.forEach(s => {
                     const masterOffset = grad.start + (s.offset / 100) * (grad.end - grad.start);

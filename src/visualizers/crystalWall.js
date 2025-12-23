@@ -16,6 +16,10 @@ const DEFAULTS = {
 export function drawCrystalWall(ctx, canvas, dataArray, bufferLength, vizColors, layer) {
     if (!layer) return;
 
+    // Force standard composition to avoid z-order confusion
+    const prevComp = ctx.globalCompositeOperation;
+    ctx.globalCompositeOperation = 'source-over';
+
     const width = canvas.width;
     const height = canvas.height;
 
@@ -61,7 +65,9 @@ export function drawCrystalWall(ctx, canvas, dataArray, bufferLength, vizColors,
     const bassBins = Math.min(20, bufferLength);
     for (let i = 0; i < bassBins; i++) sum += dataArray[i];
     const rawEnergy = bassBins > 0 ? (sum / bassBins / 255) : 0;
-    const energy = Math.pow(rawEnergy, 0.7) * INTENSITY;
+    // Use squared falloff to prevent saturation at the high end, making the color dynamic range wider
+    // Previously pow(0.7) boosted low signals too much, causing it to stick at the max (end color).
+    const energy = Math.pow(rawEnergy, 1.5) * INTENSITY;
     const pulseFactor = 1 + energy * PULSE;
 
     // Update Velocity Targets
@@ -113,16 +119,25 @@ export function drawCrystalWall(ctx, canvas, dataArray, bufferLength, vizColors,
         const ax = c * cellW + state.driftX;
         const ay = r * cellH + state.driftY;
 
-        // Deterministic jitter
-        const rotSpeed = 0.01 + h1 * 0.02;
-        const range = (15 + h2 * 25);
-        const angle = h3 * Math.PI * 2 + state.totalTime * rotSpeed;
+        // Deterministic organic movement (sum of sines)
+        const speed = 0.02 + h1 * 0.02; // Base speed unique to node
+        const range = (28 + h2 * 28);   // Range of movement (reduced by 30% as requested)
+        const t = state.totalTime;
+
+        // Independent organic motion on X and Y axes
+        // Using different prime-like multipliers (1.0, 0.7, 0.9, 1.3) avoids repeating looping patterns
+        const offX = (Math.sin(t * speed + h3 * 6.28) + Math.cos(t * speed * 0.7 + h1 * 6.28)) * range * 0.5;
+        const offY = (Math.cos(t * speed * 0.9 + h2 * 6.28) + Math.sin(t * speed * 1.3 + h3 * 6.28)) * range * 0.5;
 
         return {
-            x: ax + Math.cos(angle) * range,
-            y: ay + Math.sin(angle) * range
+            x: ax + offX,
+            y: ay + offY
         };
     };
+
+    // Pre-calculate stops once per frame
+    const sortedStops = vizColors.sortedStops ||
+        [...vizColors.stops].sort((a, b) => a.offset - b.offset);
 
     // Render loop
     for (let r = startRow; r <= endRow; r++) {
@@ -134,16 +149,18 @@ export function drawCrystalWall(ctx, canvas, dataArray, bufferLength, vizColors,
             const n_11 = getPersistentNode(c + 1, r + 1);
 
             // Triangle 1
-            fillTriangle(ctx, n_00, n_10, n_01, energy, stopRGBs, vizColors);
+            fillTriangle(ctx, n_00, n_10, n_01, energy, stopRGBs, vizColors, sortedStops, width);
             // Triangle 2
-            fillTriangle(ctx, n_10, n_11, n_01, energy, stopRGBs, vizColors);
+            fillTriangle(ctx, n_10, n_11, n_01, energy, stopRGBs, vizColors, sortedStops, width);
         }
     }
+
+    ctx.globalCompositeOperation = prevComp;
 }
 
 
 
-function fillTriangle(ctx, n1, n2, n3, energy, stopRGBs, vizColors) {
+function fillTriangle(ctx, n1, n2, n3, energy, stopRGBs, vizColors, sortedStops, width) {
     const centerX = (n1.x + n2.x + n3.x) / 3;
     const centerY = (n1.y + n2.y + n3.y) / 3;
 
@@ -151,11 +168,11 @@ function fillTriangle(ctx, n1, n2, n3, energy, stopRGBs, vizColors) {
     let colorString;
     const alpha = (0.05 + energy * 0.3);
     const useFreqSource = (vizColors.source !== 'volume');
-    const sortedStops = vizColors.sortedStops ||
-        [...vizColors.stops].sort((a, b) => a.offset - b.offset);
 
     if (vizColors.mode === 'multi-gradient' && vizColors.multiGradients) {
-        const t = useFreqSource ? (centerX / ctx.canvas.width) : energy;
+        // Clamp t to 0-1
+        let t = useFreqSource ? (centerX / width) : energy;
+        t = Math.max(0, Math.min(1, t));
         colorString = getMultiGradientColor(vizColors.multiGradients, t);
         ctx.fillStyle = colorToRgba(colorString, alpha);
         ctx.strokeStyle = colorToRgba(colorString, alpha * 0.5);
@@ -166,7 +183,10 @@ function fillTriangle(ctx, n1, n2, n3, energy, stopRGBs, vizColors) {
         ctx.strokeStyle = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha * 0.5})`;
     } else {
         // Gradient mode
-        const t = useFreqSource ? (centerX / ctx.canvas.width) : energy;
+        let t = useFreqSource ? (centerX / width) : energy;
+        // Clamp t to ensure we don't accidentally exceed gradient bounds due to floating point drift
+        t = Math.max(0, Math.min(1, t));
+
         colorString = getColorFromStops(sortedStops, t);
         ctx.fillStyle = colorToRgba(colorString, alpha);
         ctx.strokeStyle = colorToRgba(colorString, alpha * 0.5);
