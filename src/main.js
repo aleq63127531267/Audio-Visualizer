@@ -110,12 +110,20 @@ requestAnimationFrame(resize); // Defer slightly or call immediately
 setTimeout(resize, 0);
 
 const audioEngine = new AudioEngine();
-const btnTogglePanel = document.getElementById('btn-toggle-panel');
+const btnSideToggle = document.getElementById('btn-side-toggle');
 const sidePanel = document.getElementById('side-panel');
 const btnAddViz = document.getElementById('btn-add-viz');
 const btnSelectAll = document.getElementById('btn-select-all');
 const btnSelectAllRecs = document.getElementById('btn-select-all-recs');
 const layersList = document.getElementById('layers-list');
+
+if (btnSideToggle) {
+  btnSideToggle.addEventListener('click', () => {
+    sidePanel.classList.toggle('hidden');
+    const isHidden = sidePanel.classList.contains('hidden');
+    btnSideToggle.textContent = isHidden ? '❯' : '❮';
+  });
+}
 
 // Layer State
 // Layer State
@@ -157,6 +165,11 @@ const recordingsList = document.getElementById('recordings-list');
 let isRecording = false;
 let mediaRecorder = null;
 let recordedChunks = [];
+// Transform Edit Mode State
+let isEditingLayer = null;
+const editHintOverlay = document.getElementById('edit-hint-overlay');
+let editDragState = null;
+
 const backgroundState = {
   type: 'none',
   element: null,
@@ -471,6 +484,20 @@ function renderLayersList() {
     const controls = document.createElement('div');
     controls.className = 'layer-controls';
 
+    // Edit Button
+    if (typeof expTransformEdit !== 'undefined' && expTransformEdit) {
+      const btnEdit = document.createElement('button');
+      btnEdit.className = 'icon-btn btn-layer-edit';
+      btnEdit.textContent = '✎';
+      btnEdit.title = 'Edit Transform';
+      btnEdit.style.color = '#7d5fff';
+      btnEdit.onclick = (e) => {
+        e.stopPropagation();
+        enterEditMode(layer);
+      };
+      controls.appendChild(btnEdit);
+    }
+
     // Rename Button
     const btnRename = document.createElement('button');
     btnRename.className = 'icon-btn';
@@ -505,6 +532,24 @@ function renderLayersList() {
     };
 
     // Removed individual btnDel
+
+    // Download Audio
+    if (layer.audio && layer.audio.src) {
+      const btnDl = document.createElement('button');
+      btnDl.className = 'icon-btn';
+      btnDl.textContent = '⬇';
+      btnDl.title = 'Download Audio';
+      btnDl.onclick = (e) => {
+        e.stopPropagation();
+        const a = document.createElement('a');
+        a.href = layer.audio.src;
+        a.download = layer.audioName || 'download';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      };
+      controls.appendChild(btnDl);
+    }
 
     controls.appendChild(btnRename);
     controls.appendChild(btnUp);
@@ -605,9 +650,7 @@ function removeLayer(id) {
 }
 
 // Side Panel Events
-btnTogglePanel.addEventListener('click', () => {
-  sidePanel.classList.toggle('hidden');
-});
+
 
 btnAddViz.addEventListener('click', addLayer);
 
@@ -635,32 +678,77 @@ function openSoundModal() {
 }
 
 // Experimental Features Logic
-const btnExperimental = document.getElementById('btn-experimental');
-let showExperimental = false;
-const optionMultiGradient = document.querySelector('#color-mode option[value="multi-gradient"]');
+const btnExperimentalMenu = document.getElementById('btn-experimental-menu');
+const experimentalDropdown = document.getElementById('experimental-dropdown');
+const chkExpGradient = document.getElementById('chk-exp-gradient');
+const chkExpTransform = document.getElementById('chk-exp-transform');
 
-const updateExperimentalUI = () => {
-  btnExperimental.classList.toggle('active', showExperimental);
+const menuItemGradient = document.getElementById('menu-item-gradient');
+const menuItemTransform = document.getElementById('menu-item-transform');
+
+let expMultiGradient = false;
+let expTransformEdit = false;
+
+function updateMultiGradientUI() {
+  const optionMultiGradient = document.querySelector('#color-mode option[value="multi-gradient"]');
   if (optionMultiGradient) {
-    // Hide by default. Note: display:none on options works in Chrome/Firefox but not all browsers.
-    optionMultiGradient.style.display = showExperimental ? '' : 'none';
-    optionMultiGradient.disabled = !showExperimental;
-
-    // If hidden and currently selected, reset to default
-    if (!showExperimental && colorModeSelect.value === 'multi-gradient') {
+    optionMultiGradient.style.display = expMultiGradient ? '' : 'none';
+    optionMultiGradient.disabled = !expMultiGradient;
+    if (!expMultiGradient && colorModeSelect.value === 'multi-gradient') {
       colorModeSelect.value = 'gradient';
       colorModeSelect.dispatchEvent(new Event('change'));
     }
   }
-};
+}
 
-// Initialize
-updateExperimentalUI();
+function updateTransformUI() {
+  renderLayersList();
+}
 
-btnExperimental.addEventListener('click', () => {
-  showExperimental = !showExperimental;
-  updateExperimentalUI();
+// Events
+if (btnExperimentalMenu) {
+  btnExperimentalMenu.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (experimentalDropdown) experimentalDropdown.classList.toggle('hidden');
+  });
+}
+
+document.addEventListener('click', () => {
+  if (experimentalDropdown) experimentalDropdown.classList.add('hidden');
 });
+
+if (experimentalDropdown) experimentalDropdown.addEventListener('click', e => e.stopPropagation());
+
+if (menuItemGradient) {
+  menuItemGradient.addEventListener('click', (e) => {
+    if (e.target !== chkExpGradient) {
+      chkExpGradient.checked = !chkExpGradient.checked;
+      expMultiGradient = chkExpGradient.checked;
+      updateMultiGradientUI();
+    }
+  });
+  chkExpGradient.addEventListener('change', () => {
+    expMultiGradient = chkExpGradient.checked;
+    updateMultiGradientUI();
+  });
+}
+
+if (menuItemTransform) {
+  menuItemTransform.addEventListener('click', (e) => {
+    if (e.target !== chkExpTransform) {
+      chkExpTransform.checked = !chkExpTransform.checked;
+      expTransformEdit = chkExpTransform.checked;
+      updateTransformUI();
+    }
+  });
+  chkExpTransform.addEventListener('change', () => {
+    expTransformEdit = chkExpTransform.checked;
+    updateTransformUI();
+  });
+}
+
+// Init
+updateMultiGradientUI();
 
 
 // Force initial state? 
@@ -693,21 +781,43 @@ function updateLanguage() {
 
   elements.forEach(el => {
     const key = el.dataset.i18n;
-    // Skip file name if customized
     if (el.id === 'file-name' && currentMainFileName) return;
 
     if (dict[key]) {
       if (el.tagName === 'INPUT' && el.type === 'button') {
         el.value = dict[key];
       } else {
-        // Preserve any icon if it's separate? Currently icons are part of text in some buttons.
-        // My translation file includes icons (e.g. "🎤 Mic: OFF").
-        // So safe to replace.
         el.textContent = dict[key];
       }
     }
   });
+
+  // Manual Updates for Dynamic/Non-i18n elements
+  const btnExp = document.getElementById('btn-experimental-menu');
+  if (btnExp) btnExp.textContent = dict['btn_experimental'] || "Experimental ▼";
+
+  // Experimental Menu Items
+  const itemGrad = document.querySelector('#menu-item-gradient span');
+  if (itemGrad) itemGrad.textContent = dict['menu_exp_gradient'] || "Multi-Gradient";
+
+  const itemTrans = document.querySelector('#menu-item-transform span');
+  if (itemTrans) itemTrans.textContent = dict['menu_exp_transform'] || "Transform Edit";
+
+  // Group Select Buttons
+  const btnEq = document.getElementById('btn-select-group-eq');
+  if (btnEq) btnEq.textContent = dict['btn_select_eq'] || "Select EQ";
+
+  const btnStruct = document.getElementById('btn-select-group-struct');
+  if (btnStruct) btnStruct.textContent = dict['btn_select_struct'] || "Select Struct";
+
+  // Update Tutorial if open
+  const tutorialOverlay = document.getElementById('tutorial-overlay');
+  if (tutorialOverlay && !tutorialOverlay.classList.contains('hidden')) {
+    if (typeof updateTutorialFocus === 'function') updateTutorialFocus();
+  }
 }
+
+
 
 
 function closeSoundModal() {
@@ -854,21 +964,105 @@ let currentViz = 'bars';
 
 // ... (resize, throttle, AudioEngine)
 
-// Mic Logic
+
+
+// Input Source Logic
+const btnInputOptions = document.getElementById('btn-input-options');
+const inputOptionsMenu = document.getElementById('input-options-menu');
+let currentInputType = 'mic'; // 'mic' or 'desktop'
+
+if (btnInputOptions && inputOptionsMenu) {
+  // Toggle Menu
+  btnInputOptions.addEventListener('click', (e) => {
+    e.stopPropagation();
+    inputOptionsMenu.classList.toggle('hidden');
+  });
+
+  // Close menu on click outside
+  document.addEventListener('click', () => {
+    inputOptionsMenu.classList.add('hidden');
+  });
+
+  // Menu Item Selection
+  inputOptionsMenu.querySelectorAll('.menu-item').forEach(item => {
+    item.addEventListener('click', (e) => {
+      const val = e.target.getAttribute('data-value');
+      if (val) {
+        currentInputType = val;
+
+        // If active, stop so user can restart with new mode
+        if (audioEngine.isMicActive) {
+          audioEngine.stopMic();
+          btnMicToggle.classList.remove('active');
+          if (typeof isRecording !== 'undefined' && isRecording) stopRecording();
+        }
+
+        updateInputLabel();
+      }
+    });
+  });
+}
+
+function updateInputLabel() {
+  const prefix = currentInputType === 'mic' ? '🎤 Mic' : '🖥️ Desktop';
+  btnMicToggle.textContent = `${prefix}: ${audioEngine.isMicActive ? 'ON' : 'OFF'}`;
+}
+
+// Main Toggle Logic
 btnMicToggle.addEventListener('click', async () => {
   if (audioEngine.isMicActive) {
     audioEngine.stopMic();
-    btnMicToggle.textContent = '🎤 Mic: OFF';
+    updateInputLabel(); // Update label to show OFF
     btnMicToggle.classList.remove('active');
+
     // Stop recording if active
-    if (isRecording) {
+    if (typeof isRecording !== 'undefined' && isRecording) {
       stopRecording();
     }
   } else {
-    await audioEngine.startMic();
-    if (audioEngine.isMicActive) {
-      btnMicToggle.textContent = '🎤 Mic: ON';
-      btnMicToggle.classList.add('active');
+    // Start Logic
+    try {
+      if (currentInputType === 'desktop') {
+        // 🖥️ Desktop Audio
+        const stream = await navigator.mediaDevices.getDisplayMedia({
+          video: true,
+          audio: true
+        });
+
+        // Check if we got audio
+        const audioTracks = stream.getAudioTracks();
+        if (audioTracks.length === 0) {
+          stream.getTracks().forEach(t => t.stop());
+          alert('No system audio captured. Please check "Share system audio".');
+          return;
+        }
+
+        // Connect stream
+        await audioEngine.useStream(stream);
+
+        // Listener to reset button if user clicks "Stop Sharing" in browser UI
+        stream.getAudioTracks()[0].onended = () => {
+          if (audioEngine.isMicActive) {
+            audioEngine.stopMic();
+            updateInputLabel();
+            btnMicToggle.classList.remove('active');
+          }
+        };
+
+      } else {
+        // 🎤 Microphone
+        await audioEngine.startMic();
+      }
+
+      if (audioEngine.isMicActive) {
+        updateInputLabel();
+        btnMicToggle.classList.add('active');
+      }
+    } catch (err) {
+      console.error("Input capture error:", err);
+      if (err.name !== 'NotAllowedError') {
+        alert('Failed to capture input: ' + err.message);
+      }
     }
   }
 });
@@ -917,10 +1111,10 @@ function startRecording() {
 function stopRecording() {
   if (mediaRecorder && isRecording) {
     mediaRecorder.stop();
-    // Turn off mic by default after recording stops
+    // Turn off input
     if (audioEngine.isMicActive) {
       audioEngine.stopMic();
-      btnMicToggle.textContent = '🎤 Mic: OFF';
+      updateInputLabel(); // Use helper
       btnMicToggle.classList.remove('active');
     }
   }
@@ -930,17 +1124,24 @@ btnRecordMic.addEventListener('click', async () => {
   if (isRecording) {
     stopRecording();
   } else {
-    // Ensure Mic is on
+    // Ensure Input is on
     if (!audioEngine.isMicActive) {
-      await audioEngine.startMic();
-      if (audioEngine.isMicActive) {
-        btnMicToggle.textContent = '🎤 Mic: ON';
-        btnMicToggle.classList.add('active');
+      if (typeof currentInputType !== 'undefined' && currentInputType === 'mic') {
+        await audioEngine.startMic();
+        if (audioEngine.isMicActive) {
+          updateInputLabel();
+          btnMicToggle.classList.add('active');
+        } else {
+          return;
+        }
       } else {
-        return; // Failed to start mic
+        // Desktop mode or unknown
+        showAlert('Please enable Live Input first.');
+        return;
       }
     }
-    startRecording();
+
+    if (audioEngine.isMicActive) startRecording();
   }
 });
 
@@ -1342,7 +1543,6 @@ function renderRecordingsList() {
         }
       }, 50); // Increased delay to 50ms for stability
     };
-
     // Rename
     nameSpan.ondblclick = (e) => {
       e.stopPropagation();
@@ -1353,8 +1553,13 @@ function renderRecordingsList() {
         isCanceling = false;
         return;
       }
+      const newName = nameSpan.textContent.trim();
+      if (newName) {
+        rec.name = newName;
+      } else {
+        nameSpan.textContent = rec.name || 'Untitled';
+      }
       nameSpan.contentEditable = 'false';
-      rec.name = nameSpan.textContent;
     };
     nameSpan.onkeydown = (e) => {
       if (e.key === 'Enter') {
@@ -1381,6 +1586,21 @@ function renderRecordingsList() {
     btnRename.onclick = (e) => {
       e.stopPropagation();
       enableEditing();
+    };
+
+    // Download Button
+    const btnDownload = document.createElement('button');
+    btnDownload.className = 'icon-btn';
+    btnDownload.textContent = '⬇';
+    btnDownload.title = 'Download Recording';
+    btnDownload.onclick = (e) => {
+      e.stopPropagation();
+      const a = document.createElement('a');
+      a.href = rec.url;
+      a.download = (rec.name || 'recording') + '.webm';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
     };
 
     // Mini Player
@@ -1459,6 +1679,7 @@ function renderRecordingsList() {
       controls.style.display = 'none'; // Hide controls in delete mode
     } else {
       controls.appendChild(btnRename);
+      controls.appendChild(btnDownload);
       controls.appendChild(btnPlay);
       controls.appendChild(btnStop);
       controls.appendChild(slider);
@@ -1473,70 +1694,119 @@ function renderRecordingsList() {
 }
 
 function animate() {
-  const dataArray = audioEngine.getFrequencyData();
-  const bufferLength = audioEngine.dataArray ? audioEngine.dataArray.length : 0;
+  // 1. Edit Mode Rendering
+  if (isEditingLayer) {
+    const layer = isEditingLayer;
 
-  // Clear Canvas Once
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // BG
+    ctx.fillStyle = '#1e1e24';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  // Base background
-  ctx.fillStyle = '#000';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  // Draw User Background
-  if (typeof drawBackground === 'function') drawBackground();
-
-  layers.forEach(layer => {
-    if (!layer.visible) return;
-
-    let drawDataArray = null;
-    let drawBufferLength = 0;
-
-    if (audioEngine.isMicActive) {
-      if (layer.selected) {
-        // Selective Mic: only selected layers get mic data
-        drawDataArray = dataArray;
-        drawBufferLength = bufferLength;
-      } else if (layer.analyser && layer.dataArray) {
-        // Unselected layers with their own audio keep playing it
-        layer.analyser.getByteFrequencyData(layer.dataArray);
-        drawDataArray = layer.dataArray;
-        drawBufferLength = layer.analyser.frequencyBinCount;
-      } else {
-        // Unselected with no audio stay flat
-        drawDataArray = new Uint8Array(bufferLength || 1024);
-        drawBufferLength = drawDataArray.length;
-      }
-    } else {
-      // Mic is OFF: use layer audio or fallback to global file
-      if (layer.analyser && layer.dataArray) {
-        layer.analyser.getByteFrequencyData(layer.dataArray);
-        drawDataArray = layer.dataArray;
-        drawBufferLength = layer.analyser.frequencyBinCount;
-      } else {
-        drawDataArray = dataArray;
-        drawBufferLength = bufferLength;
-      }
+    // Simulated Data (Linear Gradient)
+    const simLen = layer.fftSize ? layer.fftSize / 2 : 1024;
+    const simData = new Uint8Array(simLen);
+    for (let i = 0; i < simLen; i++) {
+      simData[i] = 255 * (1 - i / simLen);
     }
 
-    // Use layer-specific colors or fall back to global
-    const layerColors = layer.colors || vizColors;
+    // Draw Layer with Transform
+    ctx.save();
+    const cx = canvas.width / 2;
+    const cy = canvas.height / 2;
+    // Apply Transform
+    ctx.translate(cx + layer.x, cy + layer.y);
+    ctx.rotate(layer.rotation);
+    ctx.scale(layer.scaleX, layer.scaleY);
+    ctx.translate(-cx, -cy);
 
     const vizFunc = visualizers[layer.type];
     if (vizFunc) {
-      ctx.save();
-      ctx.globalCompositeOperation = 'source-over'; // Ensure standard blending by default
-      ctx.globalAlpha = layer.opacity; // Use layer opacity
-      vizFunc(ctx, canvas, drawDataArray, drawBufferLength, layerColors, layer);
-      ctx.restore();
-    }
-  });
+      // Clip to layer bounds
+      ctx.beginPath();
+      ctx.rect(0, 0, canvas.width, canvas.height);
+      ctx.clip();
 
+      const layerColors = layer.colors || vizColors;
+      ctx.globalAlpha = layer.opacity;
+      vizFunc(ctx, canvas, simData, simLen, layerColors, layer);
+    }
+    ctx.restore();
+
+    // Draw Gizmo
+    drawGizmo(ctx, layer);
+
+  } else {
+    // 2. Normal Rendering
+    const dataArray = audioEngine.getFrequencyData();
+    const bufferLength = audioEngine.dataArray ? audioEngine.dataArray.length : 0;
+
+    // Clear and BG
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    if (typeof drawBackground === 'function') drawBackground();
+
+    layers.forEach(layer => {
+      if (!layer.visible) return;
+
+      let drawDataArray = null;
+      let drawBufferLength = 0;
+
+      if (audioEngine.isMicActive) {
+        if (layer.selected) {
+          drawDataArray = dataArray;
+          drawBufferLength = bufferLength;
+        } else if (layer.analyser && layer.dataArray) {
+          layer.analyser.getByteFrequencyData(layer.dataArray);
+          drawDataArray = layer.dataArray;
+          drawBufferLength = layer.analyser.frequencyBinCount;
+        } else {
+          drawDataArray = new Uint8Array(bufferLength || 1024);
+          drawBufferLength = drawDataArray.length;
+        }
+      } else {
+        if (layer.analyser && layer.dataArray) {
+          layer.analyser.getByteFrequencyData(layer.dataArray);
+          drawDataArray = layer.dataArray;
+          drawBufferLength = layer.analyser.frequencyBinCount;
+        } else {
+          drawDataArray = dataArray;
+          drawBufferLength = bufferLength;
+        }
+      }
+
+      const layerColors = layer.colors || vizColors;
+      const vizFunc = visualizers[layer.type];
+
+      if (vizFunc) {
+        ctx.save();
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.globalAlpha = layer.opacity;
+
+        // Apply Transform (Normal Mode)
+        const cx = canvas.width / 2;
+        const cy = canvas.height / 2;
+        ctx.translate(cx + (layer.x || 0), cy + (layer.y || 0));
+        ctx.rotate(layer.rotation || 0);
+        ctx.scale(layer.scaleX || 1, layer.scaleY || 1);
+        ctx.translate(-cx, -cy);
+
+        vizFunc(ctx, canvas, drawDataArray, drawBufferLength, layerColors, layer);
+        ctx.restore();
+      }
+    });
+  }
+
+  // Tutorial
+  if (typeof tutorialActive !== 'undefined' && tutorialActive && typeof drawTutorialOverlay === 'function') {
+    drawTutorialOverlay();
+  }
 
   updateUI();
-
   animationId = requestAnimationFrame(animate);
 }
+
+
 
 // Init Layers UI
 renderLayersList();
@@ -2158,6 +2428,34 @@ settingAnchorSpeedInput.addEventListener('input', (e) => {
   }
 });
 
+// Group Selection Logic
+const btnSelectGroupEQ = document.getElementById('btn-select-group-eq');
+const btnSelectGroupStruct = document.getElementById('btn-select-group-struct');
+
+if (btnSelectGroupEQ) {
+  btnSelectGroupEQ.addEventListener('click', () => {
+    const types = ['bars', 'circle', 'circle-linear'];
+    layers.forEach(l => {
+      l.selected = types.includes(l.type);
+    });
+    renderLayersList();
+    updateUI();
+    renderColorEditor();
+  });
+}
+
+if (btnSelectGroupStruct) {
+  btnSelectGroupStruct.addEventListener('click', () => {
+    const types = ['particles', 'constellation', 'crystalWall'];
+    layers.forEach(l => {
+      l.selected = types.includes(l.type);
+    });
+    renderLayersList();
+    updateUI();
+    renderColorEditor();
+  });
+}
+
 // Recording Mode
 btnRecord.addEventListener('click', () => {
   const hasAudio = layers.some(l => l.audio) || audioEngine.audioBuffer;
@@ -2313,6 +2611,28 @@ if (btnGlobalStop) {
     }
   });
 }
+// Master Volume
+const masterVolumeSlider = document.getElementById('master-volume');
+if (masterVolumeSlider) {
+  masterVolumeSlider.addEventListener('input', (e) => {
+    const val = parseFloat(e.target.value);
+    // console.log('Vol:', val);
+    audioEngine.setVolume(val);
+
+    // Update all file players
+    layers.forEach(layer => {
+      if (layer.audio) {
+        layer.audio.volume = val;
+      }
+    });
+
+    // Update background video
+    if (typeof backgroundState !== 'undefined' && backgroundState.element && backgroundState.type === 'video') {
+      backgroundState.element.volume = val;
+    }
+  });
+}
+
 // Background Logic (Handlers)
 const btnUploadBg = document.getElementById('btn-upload-bg');
 const bgUploadInput = document.getElementById('bg-upload');
@@ -2388,6 +2708,32 @@ function drawBackground() {
   }
 }
 
+// Refresh Button
+const btnRefreshViz = document.getElementById('btn-refresh-viz');
+if (btnRefreshViz) {
+  btnRefreshViz.addEventListener('click', () => {
+    const selected = layers.filter(l => l.selected);
+    const targetLayers = selected.length > 0 ? selected : layers;
+
+    let count = 0;
+    targetLayers.forEach(l => {
+      // Clear state to force re-initialization (scramble)
+      l.vizState = null;
+      count++;
+    });
+
+    if (count > 0) {
+      // Simple rotation animation
+      btnRefreshViz.style.transition = 'transform 0.5s ease';
+      btnRefreshViz.style.transform = 'rotate(360deg)';
+      setTimeout(() => {
+        btnRefreshViz.style.transition = 'none';
+        btnRefreshViz.style.transform = 'rotate(0deg)';
+      }, 500);
+    }
+  });
+}
+
 // Tutorial Logic
 const tutorialOverlay = document.getElementById('tutorial-overlay');
 const tutorialSpotlight = document.getElementById('tutorial-spotlight');
@@ -2401,16 +2747,25 @@ const btnTutClose = document.getElementById('btn-tut-close');
 const btnHelp = document.getElementById('btn-help');
 
 let currentStepIndex = 0;
+let tutRafId = null;
 
 const tutorialSteps = [
-  { target: '#btn-toggle-panel', title: 'Layers Panel', text: 'Open the sidebar to manage your visualizer layers. You can add, remove, or reorder them here.' },
-  { target: '#btn-add-viz', title: 'Add Visualizer', text: 'Click here to add new visualizer layers (Bars, Particles, etc.). You can stack multiple layers!', action: () => sidePanel.classList.remove('hidden') },
-  { target: '#visualizer-canvas', title: 'The Stage', text: 'This is where the magic happens. Your visualizers will react to the music here.' },
-  { target: '#btn-upload-bg', title: 'Backgrounds', text: 'Upload your own Image or Video to set the mood. Videos sync with playback automatically.' },
-  { target: '#btn-colors', title: 'Colors', text: 'Customize the color palette. Try "Multi-Gradient" for complex color shifting.', action: () => { sidePanel.classList.add('hidden'); } },
-  { target: '#btn-settings', title: 'Settings', text: 'Adjust fine-grained details like Particle Count, Line Weight, and Intensity.' },
-  { target: '.global-controls', title: 'Global Controls', text: 'Control playback for all layers and background videos from one convenient spot.' },
-  { target: '#btn-record', title: 'Record Mode', text: 'Create high-quality video exports of your visualizations.' }
+  { target: null, titleKey: 'tut_step_intro_title', textKey: 'tut_step_intro_text', action: () => sidePanel.classList.add('hidden') },
+  { target: '.global-controls', titleKey: 'tut_step_global_title', textKey: 'tut_step_global_text' },
+  { target: '#visualizer-canvas', titleKey: 'tut_step_stage_title', textKey: 'tut_step_stage_text' },
+  {
+    target: '#btn-side-toggle',
+    titleKey: 'tut_step_side_title',
+    textKey: 'tut_step_side_text',
+    advanceOnTargetClick: true,
+    action: () => { sidePanel.classList.add('hidden'); if (btnSideToggle) btnSideToggle.textContent = '❯'; }
+  },
+  { target: '#side-panel', titleKey: 'tut_step_panel_title', textKey: 'tut_step_panel_text', action: () => { sidePanel.classList.remove('hidden'); if (btnSideToggle) btnSideToggle.textContent = '❮'; } },
+  { target: '#viz-section-group', titleKey: 'tut_step_viz_group_title', textKey: 'tut_step_viz_group_text' },
+  { target: '#recs-section-group', titleKey: 'tut_step_recs_group_title', textKey: 'tut_step_recs_group_text' },
+  { target: '.main-controls-group', titleKey: 'tut_step_bottom_main_title', textKey: 'tut_step_bottom_main_text', action: () => { sidePanel.classList.add('hidden'); if (btnSideToggle) btnSideToggle.textContent = '❯'; } },
+  { target: '.input-controls', titleKey: 'tut_step_input_title', textKey: 'tut_step_input_text' },
+  { target: '.header-right', titleKey: 'tut_step_top_title', textKey: 'tut_step_top_text' }
 ];
 
 function updateTutorialFocus() {
@@ -2419,40 +2774,132 @@ function updateTutorialFocus() {
 
   if (step.action) step.action();
 
-  const targetEl = document.querySelector(step.target);
+  const dict = translations[currentLang];
+
+  elTutTitle.textContent = dict[step.titleKey] || step.titleKey;
+  elTutText.textContent = dict[step.textKey] || step.textKey;
+  elTutStep.textContent = `${currentStepIndex + 1}/${tutorialSteps.length}`;
+
+  const elTutLangOpts = document.getElementById('tut-lang-options');
+  if (elTutLangOpts) {
+    if (currentStepIndex === 0) elTutLangOpts.classList.remove('hidden');
+    else elTutLangOpts.classList.add('hidden');
+  }
+
+  btnTutPrev.disabled = currentStepIndex === 0;
+  btnTutNext.textContent = currentStepIndex === tutorialSteps.length - 1 ? (dict['tut_finish'] || 'Finish') : (dict['tut_next'] || 'Next');
+
+  // Handle Auto-Advance Listener
+  if (step.advanceOnTargetClick && step.target) {
+    const el = document.querySelector(step.target);
+    if (el) {
+      const nextHandler = () => {
+        // Only advance if still on this step
+        if (currentStepIndex < tutorialSteps.length && tutorialSteps[currentStepIndex] === step) {
+          btnTutNext.click();
+        }
+      };
+      el.addEventListener('click', nextHandler, { once: true });
+    }
+  }
+
+  // Start RAF loop if needed
+  if (!tutRafId) {
+    tutRafLoop();
+  }
+}
+
+function tutRafLoop() {
+  const tutorialOverlay = document.getElementById('tutorial-overlay');
+  if (!tutorialOverlay || tutorialOverlay.classList.contains('hidden')) {
+    tutRafId = null;
+    return;
+  }
+
+  updateTutorialPosition();
+  tutRafId = requestAnimationFrame(tutRafLoop);
+}
+
+function updateTutorialPosition() {
+  const step = tutorialSteps[currentStepIndex];
+  if (!step) return;
+
+  const targetEl = step.target ? document.querySelector(step.target) : null;
+
   if (targetEl) {
     const rect = targetEl.getBoundingClientRect();
+
+    // If target is effectively hidden (width/height 0), treat as null
+    if (rect.width === 0 && rect.height === 0) {
+      tutorialSpotlight.style.opacity = '0';
+      tutorialTooltip.style.top = '50%';
+      tutorialTooltip.style.left = '50%';
+      tutorialTooltip.style.transform = 'translate(-50%, -50%)';
+      return;
+    }
+
     const pad = 10;
 
-    // Position Spotlight
-    tutorialSpotlight.style.width = `${rect.width + pad * 2}px`;
-    tutorialSpotlight.style.height = `${rect.height + pad * 2}px`;
+    tutorialSpotlight.style.opacity = '1';
     tutorialSpotlight.style.top = `${rect.top - pad}px`;
     tutorialSpotlight.style.left = `${rect.left - pad}px`;
+    tutorialSpotlight.style.width = `${rect.width + (pad * 2)}px`;
+    tutorialSpotlight.style.height = `${rect.height + (pad * 2)}px`;
 
-    // Position Tooltip
+    // Tooltip Positioning
+    const tipRect = tutorialTooltip.getBoundingClientRect();
+    const tipW = tipRect.width || 300;
+    const tipH = tipRect.height || 150;
+
     let tipTop = rect.bottom + 20;
-    let tipLeft = rect.left + rect.width / 2 - 150;
+    let tipLeft = rect.left + (rect.width / 2) - (tipW / 2);
 
+    // Boundaries (Horizontal)
     if (tipLeft < 10) tipLeft = 10;
-    if (tipLeft + 300 > window.innerWidth) tipLeft = window.innerWidth - 310;
-    if (tipTop + 150 > window.innerHeight) tipTop = rect.top - 180;
+    if (tipLeft + tipW > window.innerWidth - 10) tipLeft = window.innerWidth - tipW - 10;
+
+    // Vertical flip if too low
+    if (tipTop + tipH > window.innerHeight - 10) {
+      tipTop = rect.top - tipH - 20;
+    }
+    // Safety clamp top
+    if (tipTop < 10) tipTop = 10;
 
     tutorialTooltip.style.top = `${tipTop}px`;
     tutorialTooltip.style.left = `${tipLeft}px`;
+    tutorialTooltip.style.transform = 'none';
 
-    elTutTitle.textContent = step.title;
-    elTutText.textContent = step.text;
-    elTutStep.textContent = `${currentStepIndex + 1}/${tutorialSteps.length}`;
+  } else {
+    // No target - Center Tooltip and Highlight It (Welcome Screen)
+    tutorialTooltip.style.top = '50%';
+    tutorialTooltip.style.left = '50%';
+    tutorialTooltip.style.transform = 'translate(-50%, -50%)';
 
-    btnTutPrev.disabled = currentStepIndex === 0;
-    btnTutNext.textContent = currentStepIndex === tutorialSteps.length - 1 ? 'Finish' : 'Next';
+    const ttRect = tutorialTooltip.getBoundingClientRect();
+    const pad = 10;
+
+    tutorialSpotlight.style.opacity = '1';
+    tutorialSpotlight.style.top = `${ttRect.top - pad}px`;
+    tutorialSpotlight.style.left = `${ttRect.left - pad}px`;
+    tutorialSpotlight.style.width = `${ttRect.width + (pad * 2)}px`;
+    tutorialSpotlight.style.height = `${ttRect.height + (pad * 2)}px`;
   }
 }
 
 function startTutorial() {
   currentStepIndex = 0;
   tutorialOverlay.classList.remove('hidden');
+
+  document.querySelectorAll('.tut-lang-btn').forEach(btn => {
+    btn.onclick = (e) => {
+      const lang = e.target.getAttribute('data-lang');
+      if (lang) {
+        updateLanguage(lang);
+        updateTutorialFocus();
+      }
+    };
+  });
+
   updateTutorialFocus();
 }
 
@@ -2480,4 +2927,232 @@ if (btnHelp) {
   window.addEventListener('resize', () => {
     if (!tutorialOverlay.classList.contains('hidden')) updateTutorialFocus();
   });
+}
+// Transform Edit Mode Logic
+// (State moved to top)
+
+function enterEditMode(layer) {
+  // Ensure Transform Props
+  if (typeof layer.x !== 'number') layer.x = 0;
+  if (typeof layer.y !== 'number') layer.y = 0;
+  if (typeof layer.scaleX !== 'number') layer.scaleX = 1;
+  if (typeof layer.scaleY !== 'number') layer.scaleY = 1;
+  if (typeof layer.rotation !== 'number') layer.rotation = 0;
+
+  isEditingLayer = layer;
+  if (editHintOverlay) editHintOverlay.classList.remove('hidden');
+
+  // Hide UI
+  if (typeof sidePanel !== 'undefined' && sidePanel) sidePanel.classList.add('hidden');
+  const globalControls = document.querySelector('.global-controls');
+  if (globalControls) globalControls.classList.add('hidden');
+  const headerRight = document.querySelector('.header-right');
+  if (headerRight) headerRight.classList.add('hidden');
+  if (btnTogglePanel) btnTogglePanel.style.opacity = '0';
+}
+
+function exitEditMode() {
+  isEditingLayer = null;
+  if (editHintOverlay) editHintOverlay.classList.add('hidden');
+
+  // Restore UI
+  if (btnTogglePanel) btnTogglePanel.style.opacity = '1';
+  const globalControls = document.querySelector('.global-controls');
+  if (globalControls) globalControls.classList.remove('hidden');
+  const headerRight = document.querySelector('.header-right');
+  if (headerRight) headerRight.classList.remove('hidden');
+
+  renderLayersList();
+}
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && isEditingLayer) {
+    exitEditMode();
+  }
+});
+
+canvas.addEventListener('mousedown', handleEditMouseDown);
+canvas.addEventListener('mousemove', handleEditMouseMove);
+document.addEventListener('mouseup', handleEditMouseUp);
+
+function getCanvasCoords(e) {
+  const rect = canvas.getBoundingClientRect();
+  return {
+    x: e.clientX - rect.left,
+    y: e.clientY - rect.top
+  };
+}
+
+// Gizmo Helper & Interaction Logic
+
+function getGizmoLayout(layer) {
+  const cx = canvas.width / 2;
+  const cy = canvas.height / 2;
+  const tx = cx + layer.x;
+  const ty = cy + layer.y;
+  const sx = layer.scaleX || 1;
+  const sy = layer.scaleY || 1;
+  const r = layer.rotation || 0;
+  const w = canvas.width;
+  const h = canvas.height;
+
+  const l_tl = { x: -cx, y: -cy };
+  const l_tr = { x: w - cx, y: -cy };
+  const l_br = { x: w - cx, y: h - cy };
+  const l_bl = { x: -cx, y: h - cy };
+
+  function toScreen(lp) {
+    const sx_p = lp.x * sx;
+    const sy_p = lp.y * sy;
+    const rx = sx_p * Math.cos(r) - sy_p * Math.sin(r);
+    const ry = sx_p * Math.sin(r) + sy_p * Math.cos(r);
+    return { x: rx + tx, y: ry + ty };
+  }
+
+  const tl = toScreen(l_tl);
+  const tr = toScreen(l_tr);
+  const br = toScreen(l_br);
+  const bl = toScreen(l_bl);
+
+  const tm = { x: (tl.x + tr.x) / 2, y: (tl.y + tr.y) / 2 };
+  const bm = { x: (bl.x + br.x) / 2, y: (bl.y + br.y) / 2 };
+  const lm = { x: (tl.x + bl.x) / 2, y: (tl.y + bl.y) / 2 };
+  const rm = { x: (tr.x + br.x) / 2, y: (tr.y + br.y) / 2 };
+
+  const rotDist = 50;
+  const ux = Math.sin(r);
+  const uy = -Math.cos(r);
+  const rotPos = { x: tm.x + ux * rotDist, y: tm.y + uy * rotDist };
+
+  return { tl, tr, br, bl, tm, bm, lm, rm, rotPos, center: { x: tx, y: ty } };
+}
+
+function drawGizmo(ctx, layer) {
+  const layout = getGizmoLayout(layer);
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalAlpha = 1.0;
+  ctx.globalCompositeOperation = 'source-over';
+
+  ctx.strokeStyle = '#00ff88';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(layout.tl.x, layout.tl.y);
+  ctx.lineTo(layout.tr.x, layout.tr.y);
+  ctx.lineTo(layout.br.x, layout.br.y);
+  ctx.lineTo(layout.bl.x, layout.bl.y);
+  ctx.closePath();
+  ctx.stroke();
+
+  ctx.fillStyle = '#00ff88';
+  const s = 10;
+  const drawHandle = (p) => ctx.fillRect(p.x - s / 2, p.y - s / 2, s, s);
+
+  drawHandle(layout.tl); drawHandle(layout.tr); drawHandle(layout.br); drawHandle(layout.bl);
+  drawHandle(layout.tm); drawHandle(layout.bm); drawHandle(layout.lm); drawHandle(layout.rm);
+
+  ctx.beginPath();
+  ctx.moveTo(layout.tm.x, layout.tm.y);
+  ctx.lineTo(layout.rotPos.x, layout.rotPos.y);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(layout.rotPos.x, layout.rotPos.y, 8, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function inverseTransform(mx, my, layer) {
+  const cx = canvas.width / 2;
+  const cy = canvas.height / 2;
+  const tx = cx + layer.x;
+  const ty = cy + layer.y;
+  let dx = mx - tx;
+  let dy = my - ty;
+  const r = -layer.rotation;
+  const rx = dx * Math.cos(r) - dy * Math.sin(r);
+  const ry = dx * Math.sin(r) + dy * Math.cos(r);
+  const sx = layer.scaleX || 0.001;
+  const sy = layer.scaleY || 0.001;
+  return { x: (rx / sx) + cx, y: (ry / sy) + cy };
+}
+
+function getStartProps(l, x, y) {
+  return { startX: x, startY: y, startScaleX: l.scaleX, startScaleY: l.scaleY, startRot: l.rotation };
+}
+
+function handleEditMouseDown(e) {
+  if (!isEditingLayer) return;
+  const { x, y } = getCanvasCoords(e);
+  const layout = getGizmoLayout(isEditingLayer);
+  const hitDist = 15;
+  const check = (p) => Math.hypot(p.x - x, p.y - y) < hitDist;
+
+  if (check(layout.rotPos)) {
+    editDragState = { mode: 'rotate', startX: x, startY: y, startRot: isEditingLayer.rotation, centerX: layout.center.x, centerY: layout.center.y };
+    return;
+  }
+
+  const corners = ['tl', 'tr', 'br', 'bl'];
+  for (let c of corners) {
+    if (check(layout[c])) { editDragState = { mode: 'resize', corner: c, ...getStartProps(isEditingLayer, x, y) }; return; }
+  }
+  const edges = ['tm', 'bm', 'lm', 'rm'];
+  for (let c of edges) {
+    if (check(layout[c])) { editDragState = { mode: 'resize', corner: c, ...getStartProps(isEditingLayer, x, y) }; return; }
+  }
+
+  const local = inverseTransform(x, y, isEditingLayer);
+  if (local.x >= 0 && local.x <= canvas.width && local.y >= 0 && local.y <= canvas.height) {
+    editDragState = { mode: 'move', startX: x, startY: y, initialX: isEditingLayer.x, initialY: isEditingLayer.y };
+  }
+}
+
+function handleEditMouseMove(e) {
+  if (!isEditingLayer || !editDragState) return;
+  const { x, y } = getCanvasCoords(e);
+  const layer = isEditingLayer;
+
+  if (editDragState.mode === 'move') {
+    layer.x = editDragState.initialX + (x - editDragState.startX);
+    layer.y = editDragState.initialY + (y - editDragState.startY);
+  } else if (editDragState.mode === 'rotate') {
+    const angle = Math.atan2(y - editDragState.centerY, x - editDragState.centerX);
+    layer.rotation = angle + Math.PI / 2;
+  } else if (editDragState.mode === 'resize') {
+    const cx = canvas.width / 2 + layer.x;
+    const cy = canvas.height / 2 + layer.y;
+    const dx = x - cx;
+    const dy = y - cy;
+    const r = -editDragState.startRot;
+    const rx = dx * Math.cos(r) - dy * Math.sin(r);
+    const ry = dx * Math.sin(r) + dy * Math.cos(r);
+    const ohw = canvas.width / 2;
+    const ohh = canvas.height / 2;
+    let sx = layer.scaleX; let sy = layer.scaleY;
+    const c = editDragState.corner;
+
+    if (c === 'rm') { sx = rx / ohw; }
+    else if (c === 'lm') { sx = -rx / ohw; }
+    else if (c === 'bm') { sy = ry / ohh; }
+    else if (c === 'tm') { sy = -ry / ohh; }
+    else if (c === 'br') { sx = rx / ohw; sy = ry / ohh; }
+    else if (c === 'tr') { sx = rx / ohw; sy = -ry / ohh; }
+    else if (c === 'bl') { sx = -rx / ohw; sy = ry / ohh; }
+    else if (c === 'tl') { sx = -rx / ohw; sy = -ry / ohh; }
+
+    if (Math.abs(sx) < 0.05) sx = (sx < 0 ? -0.05 : 0.05);
+    if (Math.abs(sy) < 0.05) sy = (sy < 0 ? -0.05 : 0.05);
+
+    if (c.includes('m')) {
+      if (c === 'lm' || c === 'rm') layer.scaleX = sx;
+      else layer.scaleY = sy;
+    } else {
+      layer.scaleX = sx;
+      layer.scaleY = sy;
+    }
+  }
+}
+
+function handleEditMouseUp(e) {
+  editDragState = null;
 }

@@ -27,40 +27,65 @@
             <option value="am">🇦🇲</option>
           </select>
         </div>
-        <button id="btn-experimental" class="icon-btn" title="Experimental Features"
-          style="width: auto; padding: 0 10px; font-size: 0.9rem;">Experimental</button>
+        <div class="experimental-wrapper" style="position: relative; display: inline-block;">
+          <button id="btn-experimental-menu" class="icon-btn" title="Experimental Features"
+            style="width: auto; padding: 0 10px; font-size: 0.9rem;">Experimental ▼</button>
+          <div id="experimental-dropdown" class="dropdown-menu hidden" style="left: auto; right: 0; min-width: 220px;">
+            <div class="menu-item" style="justify-content: space-between;" id="menu-item-gradient">
+              <span>Multi-Gradient</span>
+              <input type="checkbox" id="chk-exp-gradient">
+            </div>
+            <div class="menu-item" style="justify-content: space-between;" id="menu-item-transform">
+              <span>Transform Edit</span>
+              <input type="checkbox" id="chk-exp-transform">
+            </div>
+          </div>
+        </div>
         <button id="btn-help" class="icon-btn" title="Start Tutorial" style="width: auto; padding: 0 10px;">?</button>
-        <button id="btn-toggle-panel" class="icon-btn" data-i18n="btn_layers">☰ Layers</button>
       </div>
     </header>
 
     <div id="main-content">
       <aside id="side-panel" class="hidden">
-        <div class="panel-header">
-          <h2 data-i18n="panel_viz">Visualizers</h2>
-          <div class="panel-controls">
-            <button id="btn-layer-delete-mode" title="Toggle Delete Mode" class="icon-btn">🗑</button>
-            <button id="btn-select-all" title="Select/Deselect All" class="icon-btn">☑</button>
-            <button id="btn-add-viz" title="Add Visualizer">+</button>
+        <button id="btn-side-toggle">❯</button>
+        <div id="viz-section-group">
+          <div class="panel-header">
+            <h2 id="header-viz-title" data-i18n="panel_viz">Visualizers</h2>
+            <div class="panel-controls">
+              <button id="btn-layer-delete-mode" title="Toggle Delete Mode" class="icon-btn">🗑</button>
+              <button id="btn-refresh-viz" title="Refresh Visualizers" class="icon-btn">⟳</button>
+              <button id="btn-select-all" title="Select/Deselect All" class="icon-btn">☑</button>
+              <button id="btn-add-viz" title="Add Visualizer">+</button>
+            </div>
           </div>
-        </div>
-        <div id="layers-list">
-          <!-- Layers injected by JS -->
+          <div class="selection-groups"
+            style="display: flex; gap: 5px; padding: 5px 10px; border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 5px;">
+            <button id="btn-select-group-eq" class="small-btn" style="flex: 1;" title="Select Bars & Radials">Select
+              EQ</button>
+            <button id="btn-select-group-struct" class="small-btn" style="flex: 1;"
+              title="Select Particles, Constellation, Crystal">Select Struct</button>
+          </div>
+          <div id="layers-list">
+            <!-- Layers injected by JS -->
+          </div>
         </div>
 
-        <div class="panel-header">
-          <h2 data-i18n="panel_recs">Saved Recordings</h2>
-          <div class="panel-controls">
-            <button id="btn-filter-used" title="Show Used Only" class="small-btn" data-i18n="filter_used">Used</button>
-            <button id="btn-filter-unused" title="Show Unused Only" class="small-btn"
-              data-i18n="filter_unused">Unused</button>
-            <button id="btn-select-all-recs" title="Select/Deselect All" class="icon-btn">☑</button>
-            <button id="btn-rec-delete-mode" title="Toggle Delete Mode" class="icon-btn">🗑</button>
+        <div id="recs-section-group">
+          <div class="panel-header">
+            <h2 id="header-recs-title" data-i18n="panel_recs">Saved Recordings</h2>
+            <div class="panel-controls">
+              <button id="btn-filter-used" title="Show Used Only" class="small-btn"
+                data-i18n="filter_used">Used</button>
+              <button id="btn-filter-unused" title="Show Unused Only" class="small-btn"
+                data-i18n="filter_unused">Unused</button>
+              <button id="btn-select-all-recs" title="Select/Deselect All" class="icon-btn">☑</button>
+              <button id="btn-rec-delete-mode" title="Toggle Delete Mode" class="icon-btn">🗑</button>
+            </div>
           </div>
-        </div>
-        <div id="recordings-list">
-          <!-- Recordings injected by JS -->
-          <div class="empty-state">No recordings yet</div>
+          <div id="recordings-list">
+            <!-- Recordings injected by JS -->
+            <div class="empty-state">No recordings yet</div>
+          </div>
         </div>
       </aside>
 
@@ -71,34 +96,36 @@
 
     <div id="ui-container">
       <div class="controls">
-        <div class="file-info-bar">
-          <input type="file" id="audio-upload" accept="audio/*,video/*">
-          <button id="btn-test" data-i18n="btn_test">Test Freq</button>
-          <button id="btn-upload-bg" data-i18n="btn_bg">BG</button>
-          <input type="file" id="bg-upload" accept="image/*,video/*" style="display: none;">
-          <div id="file-name" data-i18n="file_no_chosen">No file chosen</div>
+        <div class="main-controls-group">
+          <div class="file-info-bar">
+            <input type="file" id="audio-upload" accept="audio/*,video/*">
+            <button id="btn-test" data-i18n="btn_test">Test Freq</button>
+            <button id="btn-upload-bg" data-i18n="btn_bg">Upload Background</button>
+            <input type="file" id="bg-upload" accept="image/*,video/*" style="display: none;">
+            <div id="file-name" data-i18n="file_no_chosen">No file chosen</div>
 
-        </div>
-
-        <div class="scrubber-container">
-          <span id="time-current">0:00</span>
-          <input type="range" id="seek-bar" value="0" min="0" step="0.1">
-          <span id="time-total">0:00</span>
-          <button id="btn-loop" class="icon-btn" title="Toggle Loop">↻</button>
-        </div>
-
-        <div class="controls-row">
-          <div class="playback-controls">
-            <button id="btn-play" data-i18n="btn_play">Play</button>
-            <button id="btn-pause" data-i18n="btn_pause">Pause</button>
-            <button id="btn-stop" data-i18n="btn_stop">Stop</button>
           </div>
 
-          <div class="viz-options">
-            <!-- viz-select removed -->
-            <button id="btn-colors" data-i18n="btn_colors">Customize Colors</button>
-            <button id="btn-settings" data-i18n="btn_settings">Settings</button>
-            <button id="btn-record" data-i18n="btn_record_mode">Record Mode</button>
+          <div class="scrubber-container">
+            <span id="time-current">0:00</span>
+            <input type="range" id="seek-bar" value="0" min="0" step="0.1">
+            <span id="time-total">0:00</span>
+            <button id="btn-loop" class="icon-btn" title="Toggle Loop">↻</button>
+          </div>
+
+          <div class="controls-row">
+            <div class="playback-controls">
+              <button id="btn-play" data-i18n="btn_play">Play</button>
+              <button id="btn-pause" data-i18n="btn_pause">Pause</button>
+              <button id="btn-stop" data-i18n="btn_stop">Stop</button>
+            </div>
+
+            <div class="viz-options">
+              <!-- viz-select removed -->
+              <button id="btn-colors" data-i18n="btn_colors">Customize Colors</button>
+              <button id="btn-settings" data-i18n="btn_settings">Settings</button>
+              <button id="btn-record" data-i18n="btn_record_mode">Record Mode</button>
+            </div>
           </div>
         </div>
 
@@ -106,7 +133,14 @@
 
         <div class="controls-row input-controls">
           <span class="control-label" data-i18n="lbl_live_input">Live Input:</span>
-          <button id="btn-mic-toggle" data-i18n="btn_mic_off">🎤 Mic: OFF</button>
+          <div class="input-group">
+            <button id="btn-mic-toggle" data-i18n="btn_mic_off">🎤 Mic: OFF</button>
+            <button id="btn-input-options" class="icon-btn" title="Select Input Source">▲</button>
+            <div id="input-options-menu" class="dropdown-menu hidden">
+              <div class="menu-item" data-value="mic">🎤 Microphone</div>
+              <div class="menu-item" data-value="desktop">🖥️ Desktop Audio</div>
+            </div>
+          </div>
           <select id="mic-select">
             <option value="default">Default Input</option>
           </select>
@@ -119,7 +153,11 @@
       <button id="btn-global-play" class="icon-btn" title="Play All">▶</button>
       <button id="btn-global-pause" class="icon-btn" title="Pause All">⏸</button>
       <button id="btn-global-stop" class="icon-btn" title="Stop All">⏹</button>
-      <button id="btn-toggle-bg" class="icon-btn" title="Toggle Background">🖼️</button>
+      <button id="btn-toggle-bg" class="icon-btn" title="Toggle Background">🖼</button>
+      <div class="vol-container" style="display: flex; align-items: center; margin-left: 10px;">
+        <label for="master-volume" style="font-size: 0.8rem; margin-right: 5px; cursor: pointer;">🔊</label>
+        <input type="range" id="master-volume" min="0" max="1" step="0.01" value="1" title="Master Volume">
+      </div>
     </div>
 
 
@@ -220,6 +258,7 @@
     </div>
 
 
+    <div id="countdown-overlay"></div>
     <div id="exit-hint" data-i18n="exit_hint">Press ESC to Stop</div>
 
     <div id="sound-modal" class="modal-overlay">
@@ -250,12 +289,23 @@
       </div>
     </div>
 
+    <!-- Edit Mode Hint -->
+    <div id="edit-hint-overlay" class="hidden"
+      style="position: fixed; bottom: 50px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.7); color: white; padding: 10px 20px; border-radius: 20px; font-size: 1.2rem; pointer-events: none; z-index: 10000;">
+      Editing Layer - Press ESC to Exit
+    </div>
+
     <!-- Tutorial Overlay -->
     <div id="tutorial-overlay" class="hidden">
       <div id="tutorial-spotlight"></div>
       <div id="tutorial-tooltip">
         <h3 id="tut-title">Welcome</h3>
         <p id="tut-text">Let's take a tour.</p>
+        <div id="tut-lang-options" class="hidden">
+          <button class="tut-lang-btn" data-lang="en">🇬🇧 English</button>
+          <button class="tut-lang-btn" data-lang="ru">🇷🇺 Русский</button>
+          <button class="tut-lang-btn" data-lang="am">🇦🇲 Հայերեն</button>
+        </div>
         <div class="tut-controls">
           <button id="btn-tut-prev" class="small-btn">Prev</button>
           <span id="tut-step">1/5</span>

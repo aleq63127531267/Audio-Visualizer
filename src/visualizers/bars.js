@@ -24,10 +24,12 @@ export function drawBars(ctx, canvas, dataArray, bufferLength, vizColors, layer)
 
     if (!bufferLength || bufferLength === 0) return; // Proactive NaN guard
 
-    const barWidth = (width / bufferLength) * barWidthMultiplier;
+    // Calculate sizing
+    const slotWidth = width / bufferLength;
+    // Use multiplier relative to slot (center aligned)
+    const barWidth = Math.max(1, slotWidth * (barWidthMultiplier > 0.1 ? barWidthMultiplier : 0.8));
 
     let barHeight;
-    let x = 0;
 
     // Use pre-sorted stops if available
     const sortedStops = vizColors.sortedStops ||
@@ -73,10 +75,12 @@ export function drawBars(ctx, canvas, dataArray, bufferLength, vizColors, layer)
     if (fillStyle) ctx.fillStyle = fillStyle;
 
     for (let i = 0; i < bufferLength; i++) {
-        barHeight = dataArray[i] * INTENSITY;
+        // Vertical scaling: % of window height
+        const percent = dataArray[i] / 255;
+        barHeight = percent * height * INTENSITY;
 
         if (!useFreqSource) {
-            const t = dataArray[i] / 255;
+            const t = percent;
             if (vizColors.mode === 'multi-gradient') {
                 ctx.fillStyle = getMultiGradientColor(vizColors.multiGradients, t);
             } else {
@@ -84,8 +88,11 @@ export function drawBars(ctx, canvas, dataArray, bufferLength, vizColors, layer)
             }
         }
 
-        ctx.fillRect(x, height - barHeight * 1.5, barWidth, barHeight * 1.5);
-        x += barWidth + 1;
+        // Horizontal positioning: Strict slots
+        const x = i * slotWidth;
+        const drawX = x + (slotWidth - barWidth) / 2;
+
+        ctx.fillRect(drawX, height - barHeight, barWidth, barHeight);
     }
 }
 

@@ -15,6 +15,7 @@ export class AudioEngine {
         // Time tracking
         this.startedAt = 0;
         this.pausedAt = 0;
+        this.masterVolume = 1.0; // Default volume
     }
 
     setLoop(enabled) {
@@ -35,6 +36,7 @@ export class AudioEngine {
         this.analyser.smoothingTimeConstant = 0.85;
 
         this.gainNode = this.audioContext.createGain();
+        this.gainNode.gain.value = this.masterVolume;
         this.gainNode.connect(this.audioContext.destination);
 
         // Connect analyser to gain
@@ -42,6 +44,18 @@ export class AudioEngine {
 
         this.bufferLength = this.analyser.frequencyBinCount;
         this.dataArray = new Uint8Array(this.bufferLength);
+    }
+    // ...
+    setVolume(value) {
+        this.masterVolume = value;
+        if (this.gainNode) {
+            try {
+                this.gainNode.gain.cancelScheduledValues(this.audioContext.currentTime);
+                this.gainNode.gain.value = value;
+            } catch (e) {
+                this.gainNode.gain.value = value;
+            }
+        }
     }
 
     async startMic() {
@@ -72,7 +86,31 @@ export class AudioEngine {
             alert('Could not access microphone.');
         }
     }
+    async useStream(stream) {
+        await this.init();
 
+        // Stop file playback if active
+        if (this.isPlaying) {
+            this.pause();
+        }
+
+        // Resume context if suspended
+        if (this.audioContext.state === 'suspended') {
+            await this.audioContext.resume();
+        }
+
+        try {
+            this.micStream = stream;
+            this.micSource = this.audioContext.createMediaStreamSource(stream);
+
+            // Connect Mic -> Analyser
+            this.micSource.connect(this.analyser);
+
+            this.isMicActive = true;
+        } catch (err) {
+            console.error('Error in useStream:', err);
+        }
+    }
     stopMic() {
         if (this.micSource) {
             this.micSource.disconnect();
@@ -86,8 +124,15 @@ export class AudioEngine {
     }
 
     setVolume(value) {
+        this.masterVolume = value;
+        // console.log('AudioEngine setVolume:', value);
         if (this.gainNode) {
-            this.gainNode.gain.setValueAtTime(value, this.audioContext.currentTime);
+            try {
+                this.gainNode.gain.cancelScheduledValues(this.audioContext.currentTime);
+                this.gainNode.gain.value = value;
+            } catch (e) {
+                this.gainNode.gain.value = value;
+            }
         }
     }
 
