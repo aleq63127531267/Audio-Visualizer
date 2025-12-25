@@ -701,7 +701,9 @@ select:hover {
 /* Recording Mode Styles */
 body.recording-mode #ui-container,
 body.recording-mode #app-header,
-body.recording-mode #panels-container {
+body.recording-mode #panels-container,
+body.recording-mode #btn-side-toggle,
+body.recording-mode .global-controls {
   display: none !important;
 }
 
