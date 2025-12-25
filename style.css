@@ -1,10 +1,129 @@
+/* Theme Variables */
+:root {
+  --bg-primary: #000;
+  --bg-secondary: rgba(15, 15, 18, 0.95);
+  --bg-tertiary: #1a1a1a;
+  --bg-hover: #2a2a2a;
+  --bg-darker: rgba(5, 5, 8, 0.9);
+  --text-primary: #fff;
+  --text-secondary: #aaa;
+  --accent-primary: #00ffff;
+  --accent-secondary: #ff00ff;
+  --border-color: rgba(0, 255, 255, 0.2);
+  --border-strong: #444;
+  --btn-bg: rgba(255, 255, 255, 0.08);
+  --btn-border: rgba(255, 255, 255, 0.25);
+  --danger: #ff5555;
+}
+
+/* Sunset Theme */
+body.theme-sunset {
+  --bg-primary: #1a0a14;
+  --bg-secondary: rgba(35, 18, 28, 0.95);
+  --bg-tertiary: #2a1520;
+  --bg-hover: #3a2030;
+  --bg-darker: rgba(15, 5, 10, 0.9);
+  --accent-primary: #ff6b35;
+  --accent-secondary: #f7931e;
+  --border-color: rgba(255, 107, 53, 0.25);
+  --border-strong: #5a3540;
+  --btn-border: rgba(255, 107, 53, 0.35);
+}
+
+/* Ocean Theme */
+body.theme-ocean {
+  --bg-primary: #0a1628;
+  --bg-secondary: rgba(18, 30, 50, 0.95);
+  --bg-tertiary: #0f1f35;
+  --bg-hover: #1a2a45;
+  --bg-darker: rgba(5, 12, 22, 0.9);
+  --accent-primary: #00d4aa;
+  --accent-secondary: #00a3cc;
+  --border-color: rgba(0, 212, 170, 0.25);
+  --border-strong: #2a4060;
+  --btn-border: rgba(0, 212, 170, 0.35);
+}
+
+/* Forest Theme */
+body.theme-forest {
+  --bg-primary: #0a140a;
+  --bg-secondary: rgba(18, 28, 18, 0.95);
+  --bg-tertiary: #1a251a;
+  --bg-hover: #253525;
+  --bg-darker: rgba(5, 10, 5, 0.9);
+  --accent-primary: #7fff00;
+  --accent-secondary: #32cd32;
+  --border-color: rgba(127, 255, 0, 0.25);
+  --border-strong: #3a4a3a;
+  --btn-border: rgba(127, 255, 0, 0.35);
+}
+
+/* Aurora Theme - Bright pink/purple */
+body.theme-aurora {
+  --bg-primary: #2d1b4e;
+  --bg-secondary: rgba(50, 30, 85, 0.95);
+  --bg-tertiary: #3d2b5e;
+  --bg-hover: #4d3b6e;
+  --bg-darker: rgba(25, 12, 42, 0.9);
+  --accent-primary: #ff6bff;
+  --accent-secondary: #b388ff;
+  --border-color: rgba(255, 107, 255, 0.25);
+  --border-strong: #5d4b7e;
+  --btn-border: rgba(255, 107, 255, 0.35);
+}
+
+/* Candy Theme - Bright pink/coral */
+body.theme-candy {
+  --bg-primary: #3d1a2e;
+  --bg-secondary: rgba(70, 35, 55, 0.95);
+  --bg-tertiary: #4d2a3e;
+  --bg-hover: #5d3a4e;
+  --bg-darker: rgba(35, 10, 22, 0.9);
+  --accent-primary: #ff69b4;
+  --accent-secondary: #ff8dc7;
+  --border-color: rgba(255, 105, 180, 0.25);
+  --border-strong: #6d4a5e;
+  --btn-border: rgba(255, 105, 180, 0.35);
+}
+
+/* Neon Theme - Electric blue/yellow */
+body.theme-neon {
+  --bg-primary: #0d0d1a;
+  --bg-secondary: rgba(20, 20, 40, 0.95);
+  --bg-tertiary: #1a1a2e;
+  --bg-hover: #2a2a3e;
+  --bg-darker: rgba(5, 5, 12, 0.9);
+  --accent-primary: #00f0ff;
+  --accent-secondary: #ffff00;
+  --border-color: rgba(0, 240, 255, 0.3);
+  --border-strong: #3a3a5e;
+  --btn-border: rgba(0, 240, 255, 0.4);
+}
+
+/* Frost Theme - Light icy blue */
+body.theme-frost {
+  --bg-primary: #e8f4f8;
+  --bg-secondary: rgba(225, 240, 250, 0.95);
+  --bg-tertiary: #d0e8f0;
+  --bg-hover: #c0d8e8;
+  --bg-darker: rgba(200, 225, 240, 0.9);
+  --text-primary: #1a3a4a;
+  --text-secondary: #3a5a6a;
+  --accent-primary: #0088cc;
+  --accent-secondary: #00aaee;
+  --border-color: rgba(0, 136, 204, 0.25);
+  --border-strong: #a0c8d8;
+  --btn-bg: rgba(0, 136, 204, 0.1);
+  --btn-border: rgba(0, 136, 204, 0.35);
+}
+
 /* Layout */
 body {
   margin: 0;
   overflow: hidden;
-  background: #000;
-  color: #fff;
-  font-family: 'Inter', sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: 'Noto Sans', 'Noto Sans Armenian', sans-serif;
   display: flex;
   flex-direction: column;
   height: 100vh;
@@ -17,10 +136,10 @@ body {
 }
 
 #app-header {
-  background: rgba(0, 0, 0, 0.8);
+  background: var(--bg-secondary);
   padding: 10px 20px;
   text-align: center;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid var(--border-color);
   z-index: 20;
   display: flex;
   justify-content: space-between;
@@ -40,8 +159,7 @@ body {
   align-items: flex-start;
   gap: 10px;
   padding: 15px 10px 5px;
-
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid var(--border-color);
   flex-shrink: 0;
 }
 
@@ -60,9 +178,9 @@ body {
   width: fit-content;
   min-width: 250px;
   max-width: 600px;
-  background: rgba(10, 10, 10, 0.95);
+  background: var(--bg-secondary);
   backdrop-filter: blur(10px);
-  border-right: 1px solid #333;
+  border-right: 1px solid var(--border-strong);
   display: flex;
   flex-direction: column;
   transition: transform 0.3s ease;
@@ -78,18 +196,16 @@ body {
 #btn-side-toggle {
   position: absolute;
   right: -30px;
-  /* Width of button */
   top: 50%;
   transform: translateY(-50%);
   width: 30px;
   height: 60px;
-  background: rgba(10, 10, 10, 0.95);
-  border: 1px solid #333;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-strong);
   border-left: none;
-  /* Merge with panel */
   border-top-right-radius: 10px;
   border-bottom-right-radius: 10px;
-  color: #fff;
+  color: var(--text-primary);
   cursor: pointer;
   z-index: 51;
   display: flex;
@@ -100,9 +216,8 @@ body {
 }
 
 #btn-side-toggle:hover {
-  background: #333;
-  color: #4ff;
-  /* slight highlight */
+  background: var(--border-strong);
+  color: var(--accent-primary);
 }
 
 /* ... headers ... */
@@ -127,10 +242,39 @@ body {
 }
 
 .icon-btn {
-  background: transparent;
-  border: 1px solid #444;
-  padding: 4px 8px;
-  font-size: 0.8rem;
+  background: var(--btn-bg);
+  border: 1px solid var(--btn-border);
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.2s;
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.icon-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+}
+
+/* Header buttons should be larger */
+.header-right .icon-btn,
+.header-right select {
+  padding: 8px 16px;
+  font-size: 0.95rem;
+  min-height: 38px;
+}
+
+/* Grouped controls consistent sizing */
+.controls-row button,
+.controls-row select {
+  min-height: 36px;
+  padding: 8px 16px;
 }
 
 #viz-stage {
@@ -200,9 +344,9 @@ body {
 }
 
 #ui-container {
-  background: #000;
+  background: var(--bg-primary);
   padding: 15px 20px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 1px solid var(--border-color);
   z-index: 10;
   display: flex;
   flex-direction: column;
@@ -221,9 +365,9 @@ body {
 button,
 select,
 input[type="file"]::file-selector-button {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: #fff;
+  background: var(--btn-bg);
+  border: 1px solid var(--btn-border);
+  color: var(--text-primary);
   padding: 8px 16px;
   border-radius: 20px;
   cursor: pointer;
@@ -233,24 +377,25 @@ input[type="file"]::file-selector-button {
   font-size: 14px;
 }
 
+button:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+  transform: translateY(-1px);
+}
+
 /* Ensure select dropdowns have proper styling on all platforms */
 select {
-  background-color: rgba(30, 30, 30, 0.95);
-  color: #fff;
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
   -webkit-appearance: none;
   -moz-appearance: none;
   appearance: none;
 }
 
 select option {
-  background-color: #1a1a1a;
-  color: #fff;
-}
-
-
-button:hover {
-  background: rgba(255, 255, 255, 0.2);
-  transform: translateY(-1px);
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
 }
 
 .playback-controls {
@@ -281,20 +426,20 @@ button:hover {
   padding: 5px 10px;
   font-size: 1.2rem;
   line-height: 1;
-  background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: rgba(255, 255, 255, 0.7);
+  background: var(--btn-bg);
+  border: 1px solid var(--btn-border);
+  color: var(--text-secondary);
 }
 
 #btn-loop:hover {
-  color: #fff;
-  border-color: rgba(255, 255, 255, 0.5);
+  color: var(--accent-primary);
+  border-color: var(--accent-primary);
 }
 
 #btn-loop.active {
   background: rgba(0, 255, 255, 0.2);
-  color: #0ff;
-  border-color: #0ff;
+  color: var(--accent-primary);
+  border-color: var(--accent-primary);
   box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
 }
 
@@ -315,13 +460,11 @@ button:hover {
 
 /* Color Panel */
 .color-panel {
-  /* Position managed by flex container */
   position: relative;
   bottom: auto;
   right: auto;
-
-  background: rgba(0, 0, 0, 0.95);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-strong);
   padding: 20px;
   border-radius: 10px;
   display: flex;
@@ -331,7 +474,6 @@ button:hover {
   max-height: 80vh;
   overflow-y: auto;
   pointer-events: auto;
-  /* Re-enable pointer events */
 }
 
 .color-panel h3 {
@@ -357,7 +499,7 @@ button:hover {
 }
 
 .gradient-preview-container {
-  background: #222;
+  background: var(--bg-tertiary);
   padding: 5px;
   border-radius: 5px;
   text-align: center;
@@ -370,46 +512,48 @@ button:hover {
   border: 1px solid #444;
 }
 
+/* Layer Container - wraps drag handle and content */
+.layer-container {
+  display: flex;
+  flex-direction: row;
+  gap: 0;
+  align-items: stretch;
+}
+
 .layer-item {
-  background: #1a1a1a;
-  border: 1px solid #333;
-  border-radius: 4px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-strong);
+  border-radius: 0 4px 4px 0;
   padding: 10px;
   display: flex;
   flex-direction: column;
   gap: 8px;
   cursor: default;
-  /* Change from pointer to default to emphasize handle for dragging */
   transition: border-color 0.2s, background 0.2s;
-  position: relative;
+  flex: 1;
 }
 
 .layer-item:hover {
-  background: #252525;
+  background: var(--bg-hover);
 }
 
 .drag-handle {
-  position: absolute;
-  left: 2px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 20px;
-  height: 100%;
+  width: 24px;
+  min-width: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: grab;
-  color: #444;
-  /* Darker as requested */
-  font-size: 1.2rem;
-  background: rgba(0, 0, 0, 0.2);
+  color: var(--text-secondary);
+  font-size: 1rem;
+  background: var(--border-strong);
   border-radius: 4px 0 0 4px;
   transition: color 0.2s, background 0.2s;
 }
 
 .drag-handle:hover {
-  color: #00ffff;
-  background: rgba(0, 0, 0, 0.4);
+  color: var(--accent-primary);
+  background: var(--bg-hover);
 }
 
 .drag-handle:active {
@@ -418,12 +562,12 @@ button:hover {
 
 .layer-item.dragging {
   opacity: 0.5;
-  background: #333;
-  border: 1px dashed #00ffff;
+  background: var(--border-strong);
+  border: 1px dashed var(--accent-primary);
 }
 
 .layer-item.drop-over {
-  border-top: 2px solid #00ffff;
+  border-top: 2px solid var(--accent-primary);
 }
 
 #layers-list {
@@ -443,13 +587,13 @@ button:hover {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  border-top: 1px solid #333;
+  border-top: 1px solid var(--border-strong);
   min-height: 100px;
 }
 
 .recording-item {
-  background: #1a1a1a;
-  border: 1px solid #333;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-strong);
   border-radius: 4px;
   padding: 12px;
   display: flex;
@@ -461,12 +605,12 @@ button:hover {
 }
 
 .recording-item:hover {
-  background: #252525;
+  background: var(--bg-hover);
 }
 
 .recording-item.selected {
-  border-color: #00ffff;
-  background: #1e2525;
+  border-color: var(--accent-primary);
+  background: var(--bg-hover);
   box-shadow: 0 0 10px rgba(0, 255, 255, 0.05);
 }
 
@@ -493,9 +637,15 @@ button:hover {
 }
 
 .layer-item.selected {
-  border-color: #00ffff;
-  background: #222;
+  border-color: var(--accent-primary);
+  background: var(--bg-hover);
   box-shadow: 0 0 10px rgba(0, 255, 255, 0.1);
+}
+
+/* Select dropdown hover */
+select:hover {
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
 }
 
 #color-stops-container {
@@ -545,6 +695,7 @@ button:hover {
   padding: 5px 10px;
   font-size: 0.9em;
   align-self: center;
+  white-space: nowrap;
 }
 
 /* Recording Mode Styles */
@@ -658,8 +809,8 @@ body.recording-mode {
 }
 
 .modal-content {
-  background: #1a1a1a;
-  border: 1px solid #333;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-strong);
   border-radius: 12px;
   padding: 30px;
   width: 400px;
@@ -671,7 +822,7 @@ body.recording-mode {
 .modal-content h3 {
   margin-bottom: 25px;
   font-size: 1.5rem;
-  color: #fff;
+  color: var(--text-primary);
 }
 
 .modal-options {
@@ -683,13 +834,13 @@ body.recording-mode {
 #alert-message {
   line-height: 1.5;
   margin-bottom: 10px;
-  color: #ccc;
+  color: var(--text-primary);
 }
 
 .modal-btn {
-  background: #2a2a2a;
-  color: #fff;
-  border: 1px solid #444;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-strong);
   padding: 15px;
   border-radius: 8px;
   cursor: pointer;
@@ -715,6 +866,131 @@ body.recording-mode {
   transform: translateY(-2px);
 }
 
+/* Theme Picker */
+.theme-picker {
+  width: 500px;
+}
+
+.theme-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.theme-card {
+  background: var(--bg-tertiary);
+  border: 2px solid var(--border-strong);
+  border-radius: 10px;
+  padding: 15px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Self-themed cards - each card shows its own theme colors */
+.theme-card[data-theme="midnight"] {
+  background: #1a1a1a;
+  border-color: #444;
+  color: #fff;
+}
+
+.theme-card[data-theme="sunset"] {
+  background: #2a1520;
+  border-color: #5a3540;
+  color: #fff;
+}
+
+.theme-card[data-theme="ocean"] {
+  background: #0f1f35;
+  border-color: #2a4060;
+  color: #fff;
+}
+
+.theme-card[data-theme="forest"] {
+  background: #1a251a;
+  border-color: #3a4a3a;
+  color: #fff;
+}
+
+.theme-card[data-theme="aurora"] {
+  background: #3d2b5e;
+  border-color: #5d4b7e;
+  color: #fff;
+}
+
+.theme-card[data-theme="candy"] {
+  background: #4d2a3e;
+  border-color: #6d4a5e;
+  color: #fff;
+}
+
+.theme-card[data-theme="neon"] {
+  background: #1a1a2e;
+  border-color: #3a3a5e;
+  color: #fff;
+}
+
+.theme-card[data-theme="frost"] {
+  background: #d0e8f0;
+  border-color: #a0c8d8;
+  color: #1a3a4a;
+}
+
+.theme-card:hover {
+  border-color: var(--accent-primary);
+  transform: translateY(-2px);
+}
+
+.theme-card.active {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 15px rgba(0, 255, 255, 0.3);
+}
+
+.theme-preview {
+  width: 100%;
+  height: 60px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.midnight-preview {
+  background: linear-gradient(135deg, #000 0%, #1a1a1a 50%, #00ffff 100%);
+}
+
+.sunset-preview {
+  background: linear-gradient(135deg, #1a0a14 0%, #2a1520 50%, #ff6b35 100%);
+}
+
+.ocean-preview {
+  background: linear-gradient(135deg, #0a1628 0%, #0f1f35 50%, #00d4aa 100%);
+}
+
+.forest-preview {
+  background: linear-gradient(135deg, #0a140a 0%, #1a251a 50%, #7fff00 100%);
+}
+
+.aurora-preview {
+  background: linear-gradient(135deg, #2d1b4e 0%, #3d2b5e 50%, #ff6bff 100%);
+}
+
+.candy-preview {
+  background: linear-gradient(135deg, #3d1a2e 0%, #4d2a3e 50%, #ff69b4 100%);
+}
+
+.neon-preview {
+  background: linear-gradient(135deg, #0d0d1a 0%, #1a1a2e 50%, #00f0ff 100%);
+}
+
+.frost-preview {
+  background: linear-gradient(135deg, #e8f4f8 0%, #d0e8f0 50%, #0088cc 100%);
+}
+
 #built-in-list {
   margin-top: 15px;
   max-height: 200px;
@@ -724,7 +1000,7 @@ body.recording-mode {
 }
 
 .track-item {
-  background: #252525;
+  background: var(--bg-hover);
   padding: 10px;
   margin-bottom: 5px;
   border-radius: 4px;
@@ -734,16 +1010,16 @@ body.recording-mode {
 }
 
 .track-item:hover {
-  background: #333;
-  color: #00ffff;
+  background: var(--border-strong);
+  color: var(--accent-primary);
 }
 
 /* Filter Buttons Glow */
 #btn-filter-used.active,
 #btn-filter-unused.active {
   background: rgba(0, 255, 255, 0.2);
-  color: #0ff;
-  border-color: #0ff;
+  color: var(--accent-primary);
+  border-color: var(--accent-primary);
   box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
 }
 
@@ -769,6 +1045,33 @@ body.recording-mode {
   color: #fff;
 }
 
+#lang-select {
+  padding: 4px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  font-size: 1.1rem;
+}
+
+.proxy-audio-btn {
+  background: var(--btn-bg);
+  border: 1px solid var(--btn-border);
+  color: var(--text-primary);
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 14px;
+  cursor: pointer;
+  backdrop-filter: blur(5px);
+  transition: all 0.2s;
+}
+
+.proxy-audio-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+  transform: translateY(-1px);
+}
+
 /* Fix for side panel overflow */
 .panel-controls {
   flex-wrap: wrap;
@@ -782,12 +1085,11 @@ body.recording-mode {
   display: flex;
   gap: 12px;
   z-index: 200;
-  /* High z-index to stay above everything */
-  background: rgba(10, 10, 12, 0.85);
+  background: var(--bg-darker);
   backdrop-filter: blur(12px);
   padding: 10px;
   border-radius: 50px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  border: 1px solid var(--border-color);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
   transition: transform 0.3s ease, opacity 0.3s ease;
 }
@@ -797,19 +1099,19 @@ body.recording-mode {
   width: 44px;
   height: 44px;
   border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--btn-border);
+  background: var(--btn-bg);
   display: flex;
   align-items: center;
   justify-content: center;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  color: white;
+  color: var(--text-primary);
 }
 
 .global-controls .icon-btn:hover {
   background: rgba(0, 255, 255, 0.1);
-  border-color: #00ffff;
-  color: #00ffff;
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
   box-shadow: 0 0 15px rgba(0, 255, 255, 0.4);
   transform: translateY(-2px);
 }
@@ -898,11 +1200,11 @@ body.recording-mode {
 #tutorial-tooltip {
   position: absolute;
   width: 300px;
-  background: rgba(30, 30, 35, 0.95);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-strong);
   border-radius: 12px;
   padding: 20px;
-  color: #fff;
+  color: var(--text-primary);
   z-index: 10002;
   pointer-events: auto;
   backdrop-filter: blur(15px);
@@ -913,14 +1215,14 @@ body.recording-mode {
 #tutorial-tooltip h3 {
   margin: 0 0 10px 0;
   font-size: 1.2rem;
-  color: #7d5fff;
+  color: var(--accent-primary);
 }
 
 #tutorial-tooltip p {
   margin: 0 0 20px 0;
   font-size: 0.95rem;
   line-height: 1.5;
-  color: #eee;
+  color: var(--text-primary);
 }
 
 .tut-controls {
@@ -977,14 +1279,16 @@ body.recording-mode {
   width: auto;
   min-width: 30px;
   margin-left: 0;
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--btn-bg);
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 #btn-input-options:hover {
-  background: rgba(255, 255, 255, 0.15);
+  background: var(--bg-hover);
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
 }
 
 .dropdown-menu {
@@ -993,8 +1297,8 @@ body.recording-mode {
   top: auto;
   left: 0;
   margin-bottom: 5px;
-  background: rgba(30, 30, 35, 0.95);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: var(--bg-secondary);
+  border: 1px solid var(--btn-border);
   border-radius: 6px;
   min-width: 160px;
   z-index: 2000;
@@ -1017,17 +1321,17 @@ body.recording-mode {
 .menu-item {
   padding: 12px 15px;
   cursor: pointer;
-  color: #eee;
+  color: var(--text-primary);
   font-size: 0.9rem;
-  transition: background 0.2s;
+  transition: background 0.2s, color 0.2s;
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
 .menu-item:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: #fff;
+  background: var(--bg-hover);
+  color: var(--accent-primary);
 }
 
 /* Experimental Menu */
@@ -1053,10 +1357,11 @@ body.recording-mode {
 
 #experimental-dropdown input[type="checkbox"] {
   cursor: pointer;
-  accent-color: #7d5fff;
+  accent-color: var(--accent-primary);
   width: 16px;
   height: 16px;
 }
+
 /* Side Panel Groups Layout */
 #viz-section-group,
 #recs-section-group {
@@ -1064,7 +1369,8 @@ body.recording-mode {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  min-height: 0; /* Important for nested flex scroll */
+  min-height: 0;
+  /* Important for nested flex scroll */
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
@@ -1087,9 +1393,9 @@ body.recording-mode {
 }
 
 .tut-lang-btn {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: white;
+  background: var(--btn-bg);
+  border: 1px solid var(--btn-border);
+  color: var(--text-primary);
   padding: 8px 12px;
   border-radius: 6px;
   cursor: pointer;
@@ -1098,7 +1404,8 @@ body.recording-mode {
 }
 
 .tut-lang-btn:hover {
-  background: rgba(0, 255, 255, 0.2);
-  border-color: #00ffff;
+  background: var(--bg-hover);
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
   transform: translateY(-2px);
 }

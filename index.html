@@ -6,6 +6,11 @@
   <link rel="icon" type="image/svg+xml" href="/vite.svg" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Music Visualizer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@300;400;500;600;700&family=Noto+Sans+Armenian:wght@300;400;500;600;700&display=swap"
+    rel="stylesheet">
   <link rel="stylesheet" href="./style.css">
 </head>
 
@@ -14,9 +19,6 @@
     <header id="app-header">
       <div class="header-left">
         <h1 data-i18n="app_title">Audio Visualizer</h1>
-        <select id="tool-select">
-          <option value="visualizer">Audio Visualizer</option>
-        </select>
       </div>
       <div class="header-right" style="display: flex; gap: 10px; align-items: center;">
         <div class="lang-menu">
@@ -27,6 +29,7 @@
             <option value="am">🇦🇲</option>
           </select>
         </div>
+        <button id="btn-theme" class="icon-btn" title="Change Theme" data-i18n="btn_theme">Theme</button>
         <div class="experimental-wrapper" style="position: relative; display: inline-block;">
           <button id="btn-experimental-menu" class="icon-btn" title="Experimental Features"
             style="width: auto; padding: 0 10px; font-size: 0.9rem;">Experimental ▼</button>
@@ -137,12 +140,12 @@
             <button id="btn-mic-toggle" data-i18n="btn_mic_off">🎤 Mic: OFF</button>
             <button id="btn-input-options" class="icon-btn" title="Select Input Source">▲</button>
             <div id="input-options-menu" class="dropdown-menu hidden">
-              <div class="menu-item" data-value="mic">🎤 Microphone</div>
-              <div class="menu-item" data-value="desktop">🖥️ Desktop Audio</div>
+              <div class="menu-item" data-value="mic" data-i18n="opt_mic">🎤 Microphone</div>
+              <div class="menu-item" data-value="desktop" data-i18n="opt_desktop">🖥️ Desktop Audio</div>
             </div>
           </div>
           <select id="mic-select">
-            <option value="default">Default Input</option>
+            <option value="default" data-i18n="opt_default_input">Default Input</option>
           </select>
           <button id="btn-record-mic" title="Record from Mic" data-i18n="btn_rec">● Rec</button>
         </div>
@@ -260,6 +263,47 @@
 
     <div id="countdown-overlay"></div>
     <div id="exit-hint" data-i18n="exit_hint">Press ESC to Stop</div>
+
+    <div id="theme-modal" class="modal-overlay">
+      <div class="modal-content theme-picker">
+        <h3 data-i18n="theme_title">Choose Theme</h3>
+        <div class="theme-grid">
+          <div class="theme-card" data-theme="midnight">
+            <div class="theme-preview midnight-preview"></div>
+            <span data-i18n="theme_midnight">Midnight</span>
+          </div>
+          <div class="theme-card" data-theme="sunset">
+            <div class="theme-preview sunset-preview"></div>
+            <span data-i18n="theme_sunset">Sunset</span>
+          </div>
+          <div class="theme-card" data-theme="ocean">
+            <div class="theme-preview ocean-preview"></div>
+            <span data-i18n="theme_ocean">Ocean</span>
+          </div>
+          <div class="theme-card" data-theme="forest">
+            <div class="theme-preview forest-preview"></div>
+            <span data-i18n="theme_forest">Forest</span>
+          </div>
+          <div class="theme-card" data-theme="aurora">
+            <div class="theme-preview aurora-preview"></div>
+            <span data-i18n="theme_aurora">Aurora</span>
+          </div>
+          <div class="theme-card" data-theme="candy">
+            <div class="theme-preview candy-preview"></div>
+            <span data-i18n="theme_candy">Candy</span>
+          </div>
+          <div class="theme-card" data-theme="neon">
+            <div class="theme-preview neon-preview"></div>
+            <span data-i18n="theme_neon">Neon</span>
+          </div>
+          <div class="theme-card" data-theme="frost">
+            <div class="theme-preview frost-preview"></div>
+            <span data-i18n="theme_frost">Frost</span>
+          </div>
+        </div>
+        <button id="btn-close-theme" class="modal-btn" data-i18n="btn_close">Close</button>
+      </div>
+    </div>
 
     <div id="sound-modal" class="modal-overlay">
       <div class="modal-content">

@@ -272,20 +272,26 @@ function renderLayersList() {
   const displayLayers = layers.map((l, i) => ({ layer: l, index: i })).reverse();
 
   displayLayers.forEach(({ layer, index }) => {
-    const item = document.createElement('div');
-    item.className = 'layer-item';
-    item.draggable = false; // Disable by default, enable only on handle mousedown
+    // Container wraps drag handle and layer content
+    const container = document.createElement('div');
+    container.className = 'layer-container';
+    container.dataset.id = layer.id;
 
-    // Drag Handle
+    // Drag Handle (outside layer-item)
     const dragHandle = document.createElement('div');
     dragHandle.className = 'drag-handle';
     dragHandle.textContent = '⠿';
 
     dragHandle.onmousedown = () => {
-      item.draggable = true;
+      container.draggable = true;
     };
 
-    item.appendChild(dragHandle);
+    // Layer Item (content area)
+    const item = document.createElement('div');
+    item.className = 'layer-item';
+
+    container.appendChild(dragHandle);
+    container.appendChild(item);
 
     // Classes
     if (layer.selected) item.classList.add('selected');
@@ -348,30 +354,21 @@ function renderLayersList() {
     });
 
     // Drag and Drop Events
-    item.dataset.id = layer.id;
-
-    // Drag and Drop Events
-    item.addEventListener('dragstart', (e) => {
-      item.classList.add('dragging');
-      // e.dataTransfer.effectAllowed = 'move'; // Optional
+    container.addEventListener('dragstart', (e) => {
+      container.classList.add('dragging');
     });
 
-    item.addEventListener('dragend', () => {
-      item.draggable = false;
-      item.classList.remove('dragging');
-      document.querySelectorAll('.layer-item').forEach(el => el.classList.remove('drop-over'));
+    container.addEventListener('dragend', () => {
+      container.draggable = false;
+      container.classList.remove('dragging');
+      document.querySelectorAll('.layer-container').forEach(el => el.classList.remove('drop-over'));
 
       // Commit new order
-      // UI is Top-to-Bottom (Front-to-Back).
-      // Array should be Back-to-Front.
-      // So proper array order is Reverse of UI order.
       const newOrder = Array.from(layersList.children)
         .map(el => layers.find(l => l.id === el.dataset.id))
-        .filter(l => l) // Safety check
+        .filter(l => l)
         .reverse();
 
-      // Update global layers array
-      // Maintain the reference if possible, or just replace content
       layers.length = 0;
       layers.push(...newOrder);
 
@@ -379,25 +376,22 @@ function renderLayersList() {
     });
 
     // Live Sort Logic
-    item.addEventListener('dragover', (e) => {
+    container.addEventListener('dragover', (e) => {
       e.preventDefault();
-      const draggingItem = document.querySelector('.layer-item.dragging');
-      if (!draggingItem || draggingItem === item) return;
+      const draggingItem = document.querySelector('.layer-container.dragging');
+      if (!draggingItem || draggingItem === container) return;
 
-      const bounding = item.getBoundingClientRect();
+      const bounding = container.getBoundingClientRect();
       const offset = bounding.y + (bounding.height / 2);
 
-      // If mouse is above the middle of the item, insert before it
-      // If below, insert after (which is insertBefore next sibling)
       if (e.clientY - offset < 0) {
-        layersList.insertBefore(draggingItem, item);
+        layersList.insertBefore(draggingItem, container);
       } else {
-        layersList.insertBefore(draggingItem, item.nextSibling);
+        layersList.insertBefore(draggingItem, container.nextSibling);
       }
     });
 
-    // Drop not strictly needed for logic but good for specific cleanup if needed
-    item.addEventListener('drop', (e) => {
+    container.addEventListener('drop', (e) => {
       e.preventDefault();
     });
 
@@ -409,8 +403,10 @@ function renderLayersList() {
     title.className = 'layer-title';
     title.id = `title-${layer.id}`; // Add ID to fix form field warning
 
+    const dict = translations[currentLang];
+
     // Name + Assigned File
-    let label = `Layer ${index + 1}: ${layer.type}`;
+    let label = `${dict['label_layer'] || 'Layer'} ${index + 1}: ${dict['viz_' + layer.type.replace(/-/g, '_')] || layer.type}`;
     if (layer.customName) label = layer.customName; // Logic for custom name
     if (layer.audioName) label += ` (${layer.audioName})`;
 
@@ -573,7 +569,7 @@ function renderLayersList() {
     Object.keys(visualizers).forEach(key => {
       const opt = document.createElement('option');
       opt.value = key;
-      opt.textContent = key;
+      opt.textContent = dict['viz_' + key.replace(/-/g, '_')] || key;
       if (key === layer.type) opt.selected = true;
       typeSel.appendChild(opt);
     });
@@ -605,7 +601,7 @@ function renderLayersList() {
 
     item.appendChild(header);
     item.appendChild(settings);
-    layersList.appendChild(item);
+    layersList.appendChild(container);
   });
 }
 
@@ -775,6 +771,71 @@ function setLanguage(lang) {
   if (langSelect) langSelect.value = lang;
 }
 
+// Theme System
+const themeModal = document.getElementById('theme-modal');
+const btnTheme = document.getElementById('btn-theme');
+const btnCloseTheme = document.getElementById('btn-close-theme');
+const themeCards = document.querySelectorAll('.theme-card');
+let currentTheme = localStorage.getItem('theme') || 'midnight';
+
+function setTheme(themeName) {
+  // Remove all theme classes
+  document.body.classList.remove(
+    'theme-sunset', 'theme-ocean', 'theme-forest',
+    'theme-aurora', 'theme-candy', 'theme-neon', 'theme-frost'
+  );
+
+  // Apply new theme (midnight is default, no class needed)
+  if (themeName !== 'midnight') {
+    document.body.classList.add(`theme-${themeName}`);
+  }
+
+  currentTheme = themeName;
+  localStorage.setItem('theme', themeName);
+
+  // Update active state on cards
+  themeCards.forEach(card => {
+    card.classList.toggle('active', card.dataset.theme === themeName);
+  });
+}
+
+// Initialize theme on load
+setTheme(currentTheme);
+
+// Theme button opens modal
+if (btnTheme) {
+  btnTheme.addEventListener('click', () => {
+    themeModal.classList.add('active');
+    // Refresh active state
+    themeCards.forEach(card => {
+      card.classList.toggle('active', card.dataset.theme === currentTheme);
+    });
+  });
+}
+
+// Close theme modal
+if (btnCloseTheme) {
+  btnCloseTheme.addEventListener('click', () => {
+    themeModal.classList.remove('active');
+  });
+}
+
+// Theme card click
+themeCards.forEach(card => {
+  card.addEventListener('click', () => {
+    setTheme(card.dataset.theme);
+  });
+});
+
+// Close modal on overlay click
+if (themeModal) {
+  themeModal.addEventListener('click', (e) => {
+    if (e.target === themeModal) {
+      themeModal.classList.remove('active');
+    }
+  });
+}
+
 function updateLanguage() {
   const elements = document.querySelectorAll('[data-i18n]');
   const dict = translations[currentLang];
@@ -805,16 +866,23 @@ function updateLanguage() {
 
   // Group Select Buttons
   const btnEq = document.getElementById('btn-select-group-eq');
-  if (btnEq) btnEq.textContent = dict['btn_select_eq'] || "Select EQ";
+  if (btnEq) btnEq.textContent = dict['btn_select_eq'] || "Select Spectral";
 
   const btnStruct = document.getElementById('btn-select-group-struct');
-  if (btnStruct) btnStruct.textContent = dict['btn_select_struct'] || "Select Struct";
+  if (btnStruct) btnStruct.textContent = dict['btn_select_struct'] || "Select Structural";
+
+  const proxyBtn = document.getElementById('btn-choose-audio');
+  if (proxyBtn) proxyBtn.textContent = dict['btn_choose_audio'] || 'Choose Audio';
 
   // Update Tutorial if open
   const tutorialOverlay = document.getElementById('tutorial-overlay');
   if (tutorialOverlay && !tutorialOverlay.classList.contains('hidden')) {
     if (typeof updateTutorialFocus === 'function') updateTutorialFocus();
   }
+
+  // Re-render lists to apply localized names/labels
+  renderLayersList();
+  renderRecordingsList();
 }
 
 
@@ -912,7 +980,8 @@ async function loadAudioToLayer(layer, url, name) {
 const originalUploadBtn = document.querySelector('input[type="file"]#audio-upload');
 // Create a proxy button instead
 const proxyBtn = document.createElement('button');
-proxyBtn.textContent = 'Choose Audio';
+proxyBtn.className = 'icon-btn proxy-audio-btn';
+proxyBtn.textContent = translations[currentLang]['btn_choose_audio'] || 'Choose Audio';
 proxyBtn.id = 'btn-choose-audio';
 proxyBtn.onclick = openSoundModal;
 originalUploadBtn.parentNode.insertBefore(proxyBtn, originalUploadBtn);
@@ -1004,8 +1073,12 @@ if (btnInputOptions && inputOptionsMenu) {
 }
 
 function updateInputLabel() {
-  const prefix = currentInputType === 'mic' ? '🎤 Mic' : '🖥️ Desktop';
-  btnMicToggle.textContent = `${prefix}: ${audioEngine.isMicActive ? 'ON' : 'OFF'}`;
+  const dict = translations[currentLang];
+  if (currentInputType === 'mic') {
+    btnMicToggle.textContent = audioEngine.isMicActive ? dict['btn_mic_on'] : dict['btn_mic_off'];
+  } else {
+    btnMicToggle.textContent = audioEngine.isMicActive ? dict['btn_desktop_on'] : dict['btn_desktop_off'];
+  }
 }
 
 // Main Toggle Logic
@@ -1021,6 +1094,7 @@ btnMicToggle.addEventListener('click', async () => {
     }
   } else {
     // Start Logic
+    updateInputLabel(); // Ensure label reflects language and mode before starting
     try {
       if (currentInputType === 'desktop') {
         // 🖥️ Desktop Audio
@@ -1092,7 +1166,8 @@ function startRecording() {
     const blob = new Blob(recordedChunks, { type: 'audio/webm' });
     const url = URL.createObjectURL(blob);
     const id = 'rec-' + Date.now();
-    const name = `Recording ${recordings.length + 1}`;
+    const dict = translations[currentLang];
+    const name = `${dict['label_recording'] || 'Recording'} ${recordings.length + 1}`;
 
     recordings.push({ id, url, name, blob });
     renderRecordingsList();
@@ -1454,10 +1529,11 @@ function renderRecordingsList() {
   }
 
   if (displayRecs.length === 0) {
+    const dict = translations[currentLang];
     if (recordings.length === 0) {
-      recordingsList.innerHTML = '<div class="empty-state">No recordings yet</div>';
+      recordingsList.innerHTML = `<div class="empty-state">${dict['empty_recs'] || 'No recordings yet'}</div>`;
     } else {
-      recordingsList.innerHTML = '<div class="empty-state">No matching recordings</div>';
+      recordingsList.innerHTML = `<div class="empty-state">${dict['empty_no_match'] || 'No matching recordings'}</div>`;
     }
     return;
   }
@@ -2891,10 +2967,10 @@ function startTutorial() {
   tutorialOverlay.classList.remove('hidden');
 
   document.querySelectorAll('.tut-lang-btn').forEach(btn => {
-    btn.onclick = (e) => {
-      const lang = e.target.getAttribute('data-lang');
+    btn.onclick = () => {
+      const lang = btn.getAttribute('data-lang');
       if (lang) {
-        updateLanguage(lang);
+        setLanguage(lang);
         updateTutorialFocus();
       }
     };
